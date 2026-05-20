@@ -5,6 +5,7 @@
 .gitignore
 .vscode/
 node_modules/
+statistikk/
 migrations/
 README.md
 schema.sql

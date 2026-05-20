@@ -161,6 +161,7 @@ jobs:
               --no-perms \
               --no-owner \
               --no-group \
+              --filter='P /statistikk/' \
               --exclude-from=".github/rsync-exclude.txt" \
               -e "ssh -p ${WEBHUSET_PORT:-22}" \
               ./ \
@@ -178,6 +179,7 @@ jobs:
               --no-perms \
               --no-owner \
               --no-group \
+              --filter='P /statistikk/' \
               --exclude-from=".github/rsync-exclude.txt" \
               -e "ssh -p ${WEBHUSET_PORT:-22}" \
               ./ \

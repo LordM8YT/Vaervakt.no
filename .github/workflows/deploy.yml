@@ -28,8 +28,7 @@ jobs:
       - name: Install production dependencies
         run: composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
 
-      - name: Install sshpass when using password auth
-        if: ${{ secrets.WEBHUSET_PASSWORD != '' }}
+      - name: Install sshpass
         run: |
           sudo apt-get update
           sudo apt-get install -y sshpass

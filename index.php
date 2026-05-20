@@ -10,6 +10,59 @@ $supportReady = $supportUrl !== '';
 $supportLabel = defined('SUPPORT_LABEL') && trim((string) SUPPORT_LABEL) !== '' ? trim((string) SUPPORT_LABEL) : 'Støtt med Vipps';
 $pushReady = defined('VAPID_PUBLIC') && trim((string) VAPID_PUBLIC) !== '';
 
+function loadPatchnotes($filePath) {
+    if (!is_file($filePath) || !is_readable($filePath)) {
+        return [];
+    }
+
+    $raw = file_get_contents($filePath);
+    if ($raw === false || trim($raw) === '') {
+        return [];
+    }
+
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        return [];
+    }
+
+    $notes = [];
+    foreach ($decoded as $entry) {
+        if (!is_array($entry)) {
+            continue;
+        }
+
+        $title = trim((string)($entry['title'] ?? ''));
+        $date = trim((string)($entry['date'] ?? ''));
+        if ($title === '' || $date === '') {
+            continue;
+        }
+
+        $items = [];
+        if (isset($entry['items']) && is_array($entry['items'])) {
+            foreach ($entry['items'] as $item) {
+                $item = trim((string)$item);
+                if ($item !== '') {
+                    $items[] = $item;
+                }
+            }
+        }
+
+        $notes[] = [
+            'title' => $title,
+            'date' => $date,
+            'summary' => trim((string)($entry['summary'] ?? '')),
+            'tag' => trim((string)($entry['tag'] ?? '')),
+            'items' => $items,
+        ];
+    }
+
+    usort($notes, function ($a, $b) {
+        return strcmp($b['date'], $a['date']);
+    });
+
+    return $notes;
+}
+
 function tableExistsLocal($pdo, $name) {
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?");
     $stmt->execute([$name]);
@@ -116,11 +169,26 @@ function formatRelativeTimeLabel($timestamp) {
     return $created->format('d.m H:i');
 }
 
+function formatPatchnoteDateLabel($dateString) {
+    if (!$dateString) {
+        return '';
+    }
+
+    try {
+        $date = new DateTime($dateString);
+        return $date->format('d.m.Y');
+    } catch (Exception $e) {
+        return (string)$dateString;
+    }
+}
+
 $latestReportsPayload = fetchWeatherReportsForUi($pdo, 15);
 $latestReports = $latestReportsPayload['rows'];
 $mapReportsPayload = fetchWeatherReportsForUi($pdo, 50);
 $mapReports = $mapReportsPayload['rows'];
 $reportsHaveCoords = (bool)$mapReportsPayload['has_coords'];
+$patchnotes = loadPatchnotes(__DIR__ . DIRECTORY_SEPARATOR . 'patchnotes.json');
+$latestPatchnote = $patchnotes ? $patchnotes[0] : null;
 
 // Hent værdata fra MET.no med feilhåndtering
 $temp_now = '--';
@@ -192,6 +260,10 @@ try {
         .support-card { position: relative; overflow: hidden; }
         .support-card::after { content: ""; position: absolute; inset: auto -20% -35% auto; width: 220px; height: 220px; border-radius: 9999px; background: radial-gradient(circle, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0) 70%); pointer-events: none; }
         .support-card.is-pending { border-color: rgba(148, 163, 184, 0.14); }
+        .modal-panel { max-height: min(82svh, 860px); overflow: hidden; }
+        .modal-scroll { overflow-y: auto; }
+        .patchnote-accent { background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(14, 165, 233, 0.04)); }
+        .patchnote-entry { background: rgba(2, 6, 23, 0.45); }
         header, main { position: relative; z-index: 1; }
         #mapContainer, #leafletMap, .leaflet-container { position: relative; z-index: 0; isolation: isolate; }
         .leaflet-pane, .leaflet-top, .leaflet-bottom, .leaflet-control { z-index: 10 !important; }
@@ -201,15 +273,52 @@ try {
 </head>
 <body class="flex flex-col">
 
-    <div id="infoModal" class="modal p-6" onclick="this.classList.remove('active')">
+    <div id="infoModal" class="modal p-6" onclick="closeModal('infoModal')" aria-hidden="true">
         <div class="glass-card p-10 rounded-[2.5rem] max-w-sm w-full text-center" onclick="event.stopPropagation()">
             <h2 class="text-xl font-black italic uppercase text-sky-400 mb-4">VÆRVAKT INFO</h2>
             <p class="text-slate-300 text-sm leading-relaxed">
                 Værvakt.no er en app der folk kan melde inn været de ser og varsle naboer, venner og familier om fare knyttet til været.
             </p>
-            <button onclick="document.getElementById('infoModal').classList.remove('active')" class="mt-8 bg-sky-500 w-full py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-sky-500/20">LUKK</button>
+            <button onclick="closeModal('infoModal')" class="mt-8 bg-sky-500 w-full py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-sky-500/20">LUKK</button>
         </div>
     </div>
+
+    <?php if ($patchnotes): ?>
+    <div id="patchnotesModal" class="modal p-4 sm:p-6" onclick="closeModal('patchnotesModal')" aria-hidden="true">
+        <div class="glass-card modal-panel w-full max-w-3xl rounded-[2.5rem] border border-white/10 shadow-2xl" onclick="event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="patchnotesTitle">
+            <div class="flex items-center justify-between gap-4 border-b border-white/10 px-6 py-5 sm:px-8">
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-[0.2em] text-sky-400">Patchnotes</p>
+                    <h2 id="patchnotesTitle" class="mt-2 text-xl font-black text-white sm:text-2xl">Hva som er nytt i Vaervakt</h2>
+                </div>
+                <button type="button" onclick="closeModal('patchnotesModal')" class="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-300">Lukk</button>
+            </div>
+            <div class="modal-scroll space-y-4 px-4 py-4 sm:px-6 sm:py-6">
+                <?php foreach ($patchnotes as $note): ?>
+                    <article class="patchnote-entry rounded-[2rem] border border-white/8 p-5 sm:p-6">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="rounded-full border border-sky-400/20 bg-sky-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-sky-200"><?= htmlspecialchars(formatPatchnoteDateLabel($note['date'])) ?></span>
+                            <?php if (!empty($note['tag'])): ?>
+                                <span class="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-300"><?= htmlspecialchars($note['tag']) ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <h3 class="mt-4 text-lg font-black text-white sm:text-xl"><?= htmlspecialchars($note['title']) ?></h3>
+                        <?php if (!empty($note['summary'])): ?>
+                            <p class="mt-2 text-sm leading-relaxed text-slate-300"><?= htmlspecialchars($note['summary']) ?></p>
+                        <?php endif; ?>
+                        <?php if (!empty($note['items'])): ?>
+                            <div class="mt-4 grid gap-3">
+                                <?php foreach ($note['items'] as $item): ?>
+                                    <div class="patchnote-accent rounded-[1.5rem] border border-white/6 px-4 py-3 text-sm leading-relaxed text-slate-200"><?= htmlspecialchars($item) ?></div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                    </article>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <header class="p-6 text-center flex flex-col items-center">
         <h1 class="text-3xl font-black tracking-tighter text-sky-400 italic uppercase mb-4">VÆRVAKT.NO</h1>
@@ -224,6 +333,9 @@ try {
             <div class="flex flex-wrap gap-3 justify-center mt-3">
                 <button id="pushBtn" <?= $pushReady ? '' : 'disabled' ?> class="<?= $pushReady ? 'bg-sky-500' : 'bg-slate-800 text-slate-400 cursor-not-allowed' ?> px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-widest"><?= $pushReady ? 'Aktiver varsler' : 'Varsler kommer snart' ?></button>
                 <button id="installBtn" class="hidden bg-slate-700 px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-widest">Installer app</button>
+                <?php if ($patchnotes): ?>
+                    <button type="button" onclick="openModal('patchnotesModal')" class="bg-slate-800 px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-widest">Patchnotes</button>
+                <?php endif; ?>
                 <button id="shareBtn" class="bg-slate-800 px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-widest">Del appen</button>
             </div>
         </div>
@@ -326,6 +438,34 @@ try {
             </div>
         </div>
 
+        <?php if ($latestPatchnote): ?>
+        <section class="glass-card rounded-[2.5rem] border border-white/5 p-6 shadow-xl">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div class="max-w-2xl">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <p class="text-[10px] font-black uppercase tracking-[0.2em] text-sky-400">Nyeste patchnote</p>
+                        <span class="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-300"><?= htmlspecialchars(formatPatchnoteDateLabel($latestPatchnote['date'])) ?></span>
+                        <?php if (!empty($latestPatchnote['tag'])): ?>
+                            <span class="rounded-full border border-sky-400/20 bg-sky-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-sky-200"><?= htmlspecialchars($latestPatchnote['tag']) ?></span>
+                        <?php endif; ?>
+                    </div>
+                    <h3 class="mt-3 text-xl font-black text-white sm:text-2xl"><?= htmlspecialchars($latestPatchnote['title']) ?></h3>
+                    <?php if (!empty($latestPatchnote['summary'])): ?>
+                        <p class="mt-2 text-sm leading-relaxed text-slate-300"><?= htmlspecialchars($latestPatchnote['summary']) ?></p>
+                    <?php endif; ?>
+                </div>
+                <button type="button" onclick="openModal('patchnotesModal')" class="inline-flex items-center justify-center rounded-2xl bg-slate-900/70 px-5 py-3 text-xs font-black uppercase tracking-widest text-white">Se alle patchnotes</button>
+            </div>
+            <?php if (!empty($latestPatchnote['items'])): ?>
+                <div class="mt-4 grid gap-3">
+                    <?php foreach (array_slice($latestPatchnote['items'], 0, 3) as $item): ?>
+                        <div class="patchnote-accent rounded-[1.5rem] border border-white/6 px-4 py-3 text-sm leading-relaxed text-slate-200"><?= htmlspecialchars($item) ?></div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </section>
+        <?php endif; ?>
+
         <div class="glass-card p-8 rounded-[2.5rem] shadow-xl border border-white/5">
             <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
                 <h3 id="obsTitle" class="text-[10px] font-black text-sky-500 uppercase tracking-widest text-center italic">Siste observasjoner</h3>
@@ -371,7 +511,7 @@ try {
                 <i data-lucide="waves" class="w-6 h-6"></i>
                 <span class="text-[9px] mt-1.5 font-black uppercase">Flom/Snø</span>
             </button>
-            <button onclick="document.getElementById('infoModal').classList.add('active')" class="flex flex-col items-center text-slate-500">
+            <button onclick="openModal('infoModal')" class="flex flex-col items-center text-slate-500">
                 <i data-lucide="shield-check" class="w-6 h-6"></i>
                 <span class="text-[9px] mt-1.5 font-black uppercase">Info</span>
             </button>
@@ -380,6 +520,36 @@ try {
 
     <script>
         lucide.createIcons();
+
+        function openModal(id) {
+            const modal = document.getElementById(id);
+            if (!modal) return;
+            modal.classList.add('active');
+            modal.setAttribute('aria-hidden', 'false');
+            document.documentElement.style.overflow = 'hidden';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal(id) {
+            const modal = document.getElementById(id);
+            if (!modal) return;
+            modal.classList.remove('active');
+            modal.setAttribute('aria-hidden', 'true');
+            if (!document.querySelector('.modal.active')) {
+                document.documentElement.style.overflow = '';
+                document.body.style.overflow = '';
+            }
+        }
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key !== 'Escape') return;
+            document.querySelectorAll('.modal.active').forEach((modal) => {
+                modal.classList.remove('active');
+                modal.setAttribute('aria-hidden', 'true');
+            });
+            document.documentElement.style.overflow = '';
+            document.body.style.overflow = '';
+        });
 
         const SUBMIT_DEFAULT_LABEL = 'Send værrapport';
 

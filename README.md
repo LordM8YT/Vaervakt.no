@@ -37,6 +37,8 @@ SUPPORT_LABEL=Støtt med Vipps
 - `subscriptions.php` / `send_push.php` – push-abonnementer og utsending
 - `service-worker.js` / `manifest.json` – PWA, caching og installasjon
 
+- `patchnotes.json` - patchnotes som rendres i appen med nyeste note overst
+
 ### 3. Database-setup
 
 Kjør SQL-skriptet for å opprette tabeller:
@@ -82,6 +84,15 @@ Appen støtter begge disse tabellvariantene:
 - eldre `reports`
 
 UI og lagring mapper automatisk mellom skjemaene.
+
+### Patchnotes
+
+Patchnotes hentes fra `patchnotes.json`.
+
+- Legg til en ny post med `date`, `title`, `summary` og `items`
+- Bruk ISO-dato som `2026-05-20`
+- Appen sorterer automatisk nyeste note overst
+- Eldre noter blir liggende i historikken og vises i patchnotes-modal
 
 ### Legg til koordinater (migrasjon)
 Hvis du ønsker å lagre GPS-posisjon for hver rapport, kjør migrasjonen i `migrations/migrasjon_add_latlon.sql` eller disse SQL-kommandoene mot databasen:

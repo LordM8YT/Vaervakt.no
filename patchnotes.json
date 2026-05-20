@@ -1,0 +1,37 @@
+[
+  {
+    "date": "2026-05-20",
+    "tag": "Nytt",
+    "title": "Stor app-oppdatering",
+    "summary": "Vaervakt er naermere en ekte mobilapp, med mer stabil rapportflyt og bedre handoff for videre utvikling.",
+    "items": [
+      "Ny patchnotes-seksjon i appen med historikk og nyeste oppdatering oeverst.",
+      "Push-varsler, Vipps-stotte og automatisk deploy fra GitHub er na satt opp.",
+      "Rapporter kan lagres offline og sendes automatisk nar nettet er tilbake.",
+      "Geolokasjon og stedshenting fungerer bedre, ogsa utenfor Norge."
+    ]
+  },
+  {
+    "date": "2026-05-19",
+    "tag": "Mobil",
+    "title": "Mobilflyt og rapportering",
+    "summary": "Rapportskjemaet ble strammet inn for mobil og gjort mer app-lignende.",
+    "items": [
+      "Bottom sheet for rapportering med trygg safe-area nederst.",
+      "Pull-to-refresh, haptisk feedback og mindre friksjon ved innsending.",
+      "Input-felter bruker 16px for aa hindre iPhone-zoom ved fokus.",
+      "Overscroll og kartlag ble justert for en roligere mobilopplevelse."
+    ]
+  },
+  {
+    "date": "2026-05-18",
+    "tag": "Kart",
+    "title": "Kart, feed og lokale observasjoner",
+    "summary": "Kart og feed jobber tettere sammen og gjor lokale vaerobservasjoner lettere aa lese.",
+    "items": [
+      "Observasjoner kan vises baade i feed og direkte pa kartet.",
+      "Forbedret feed-status, tomtilstander og highlight av nye rapporter.",
+      "Stedsok, favoritter og naerliggende rapporter gir raskere flyt i appen."
+    ]
+  }
+]

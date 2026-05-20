@@ -1,0 +1,11 @@
+.env
+.env.*
+.git/
+.github/
+.vscode/
+node_modules/
+release/
+vendor/bin/
+*.log
+*.sql.bak
+*.zip

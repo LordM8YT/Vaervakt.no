@@ -246,6 +246,8 @@ Filer som styrer deploy:
 
 - `.github/workflows/deploy.yml`
 - `.github/rsync-exclude.txt`
+- `.github/workflows/release.yml`
+- `.github/release-package-exclude.txt`
 
 Workflowen kjører automatisk når du pusher til `main`, og kan også startes manuelt fra GitHub under `Actions`.
 
@@ -284,6 +286,39 @@ Hvis du starter med passord og senere vil stramme opp sikkerheten, kan du bytte 
 3. Bekreft at `WEBHUSET_REMOTE_PATH` peker til riktig mappe.
 4. Push til `main`.
 5. Sjekk `Actions`-fanen i GitHub for første deploy.
+
+## 📦 GitHub Releases
+
+Repoet er også satt opp med automatiske GitHub Releases.
+
+Når du pusher en tag som `v1.0.0`, skjer dette automatisk:
+
+1. GitHub bygger appen med produksjonsavhengigheter.
+2. Det lages en ZIP-pakke som er trygg å dele videre.
+3. Det opprettes en GitHub Release med auto-genererte release notes.
+4. Release-siden får både ZIP-fil og `sha256`-checksum som vedlegg.
+
+Dette gjør det enklere for andre å:
+
+- laste ned siste stabile versjon
+- hente en deploy-klar pakke uten `.env`
+- se en tydelig historikk over versjoner
+
+### Lage en ny release
+
+Kjør fra repoet lokalt:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Bytt `v1.0.0` til neste versjon, for eksempel `v1.0.1` eller `v1.1.0`.
+
+### Hva som lastes ned
+
+- GitHub sin innebygde `Source code (zip)` er best for utviklere som vil jobbe videre i repoet.
+- `vaervakt-no-vX.Y.Z.zip`-asseten er best når noen bare vil hente siste appversjon raskt.
 
 ## 🔔 Push-varsler og VAPID
 

@@ -35,12 +35,12 @@ jobs:
 
       - name: Prepare SSH
         env:
-          WEBHUSET_HOST: ${{ secrets.WEBHUSET_HOST || vars.WEBHUSET_HOST }}
+          WEBHUSET_HOST: linweb22.hmg9.webhuset.no
           WEBHUSET_KNOWN_HOSTS: ${{ secrets.WEBHUSET_KNOWN_HOSTS }}
           WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD }}
-          WEBHUSET_PORT: ${{ secrets.WEBHUSET_PORT || vars.WEBHUSET_PORT }}
+          WEBHUSET_PORT: 22
           WEBHUSET_SSH_KEY: ${{ secrets.WEBHUSET_SSH_KEY }}
-          WEBHUSET_USERNAME: ${{ secrets.WEBHUSET_USERNAME || vars.WEBHUSET_USERNAME }}
+          WEBHUSET_USERNAME: xnvrvaktpuano
         run: |
           set -eu
           : "${WEBHUSET_HOST:?Missing WEBHUSET_HOST secret}"
@@ -67,12 +67,12 @@ jobs:
 
       - name: Validate deploy configuration
         env:
-          WEBHUSET_HOST: ${{ secrets.WEBHUSET_HOST || vars.WEBHUSET_HOST }}
+          WEBHUSET_HOST: linweb22.hmg9.webhuset.no
           WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD }}
-          WEBHUSET_PORT: ${{ secrets.WEBHUSET_PORT || vars.WEBHUSET_PORT }}
-          WEBHUSET_REMOTE_PATH: ${{ secrets.WEBHUSET_REMOTE_PATH || vars.WEBHUSET_REMOTE_PATH }}
+          WEBHUSET_PORT: 22
+          WEBHUSET_REMOTE_PATH: /home/X/xnvrvaktpuano/www
           WEBHUSET_SSH_KEY: ${{ secrets.WEBHUSET_SSH_KEY }}
-          WEBHUSET_USERNAME: ${{ secrets.WEBHUSET_USERNAME || vars.WEBHUSET_USERNAME }}
+          WEBHUSET_USERNAME: xnvrvaktpuano
         run: |
           set -eu
           : "${WEBHUSET_HOST:?Missing WEBHUSET_HOST secret}"
@@ -91,12 +91,12 @@ jobs:
 
       - name: Ensure remote path exists
         env:
-          WEBHUSET_HOST: ${{ secrets.WEBHUSET_HOST || vars.WEBHUSET_HOST }}
+          WEBHUSET_HOST: linweb22.hmg9.webhuset.no
           WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD }}
-          WEBHUSET_PORT: ${{ secrets.WEBHUSET_PORT || vars.WEBHUSET_PORT }}
-          WEBHUSET_REMOTE_PATH: ${{ secrets.WEBHUSET_REMOTE_PATH || vars.WEBHUSET_REMOTE_PATH }}
+          WEBHUSET_PORT: 22
+          WEBHUSET_REMOTE_PATH: /home/X/xnvrvaktpuano/www
           WEBHUSET_SSH_KEY: ${{ secrets.WEBHUSET_SSH_KEY }}
-          WEBHUSET_USERNAME: ${{ secrets.WEBHUSET_USERNAME || vars.WEBHUSET_USERNAME }}
+          WEBHUSET_USERNAME: xnvrvaktpuano
         run: |
           set -eu
           : "${WEBHUSET_REMOTE_PATH:?Missing WEBHUSET_REMOTE_PATH secret}"
@@ -114,12 +114,12 @@ jobs:
 
       - name: Verify SSH login and remote path
         env:
-          WEBHUSET_HOST: ${{ secrets.WEBHUSET_HOST || vars.WEBHUSET_HOST }}
+          WEBHUSET_HOST: linweb22.hmg9.webhuset.no
           WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD }}
-          WEBHUSET_PORT: ${{ secrets.WEBHUSET_PORT || vars.WEBHUSET_PORT }}
-          WEBHUSET_REMOTE_PATH: ${{ secrets.WEBHUSET_REMOTE_PATH || vars.WEBHUSET_REMOTE_PATH }}
+          WEBHUSET_PORT: 22
+          WEBHUSET_REMOTE_PATH: /home/X/xnvrvaktpuano/www
           WEBHUSET_SSH_KEY: ${{ secrets.WEBHUSET_SSH_KEY }}
-          WEBHUSET_USERNAME: ${{ secrets.WEBHUSET_USERNAME || vars.WEBHUSET_USERNAME }}
+          WEBHUSET_USERNAME: xnvrvaktpuano
         run: |
           set -eu
 
@@ -138,12 +138,12 @@ jobs:
 
       - name: Sync files to Webhuset
         env:
-          WEBHUSET_HOST: ${{ secrets.WEBHUSET_HOST || vars.WEBHUSET_HOST }}
+          WEBHUSET_HOST: linweb22.hmg9.webhuset.no
           WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD }}
-          WEBHUSET_PORT: ${{ secrets.WEBHUSET_PORT || vars.WEBHUSET_PORT }}
-          WEBHUSET_REMOTE_PATH: ${{ secrets.WEBHUSET_REMOTE_PATH || vars.WEBHUSET_REMOTE_PATH }}
+          WEBHUSET_PORT: 22
+          WEBHUSET_REMOTE_PATH: /home/X/xnvrvaktpuano/www
           WEBHUSET_SSH_KEY: ${{ secrets.WEBHUSET_SSH_KEY }}
-          WEBHUSET_USERNAME: ${{ secrets.WEBHUSET_USERNAME || vars.WEBHUSET_USERNAME }}
+          WEBHUSET_USERNAME: xnvrvaktpuano
         run: |
           set -eu
 

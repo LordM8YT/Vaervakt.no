@@ -1,0 +1,17 @@
+.env
+.env.*
+.git/
+.github/
+.gitignore
+.vscode/
+node_modules/
+migrations/
+README.md
+schema.sql
+backup_db.sh
+backup_db.ps1
+deploy.sh
+deploy.ps1
+*.log
+*.sql.bak
+*.zip

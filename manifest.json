@@ -1,0 +1,29 @@
+{
+  "id": "/",
+  "name": "Værvakt.no",
+  "short_name": "Værvakt",
+  "description": "Lokale værobservasjoner, kart og raske rapporter fra der du er.",
+  "lang": "nb-NO",
+  "start_url": "/index.php",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0f1a",
+  "theme_color": "#0b0f1a",
+  "icons": [
+    {
+      "src": "/icons/vaervakt-icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Ny rapport",
+      "short_name": "Rapporter",
+      "url": "/index.php#reportForm",
+      "description": "Gå rett til skjemaet for å sende en ny værrapport."
+    }
+  ]
+}

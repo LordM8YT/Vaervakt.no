@@ -1,0 +1,7 @@
+<Files .env>
+    Order allow,deny
+    Deny from all
+</Files>
+
+# Sørg for at UTF-8 er standard
+AddDefaultCharset UTF-8

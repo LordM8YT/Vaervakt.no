@@ -1,0 +1,126 @@
+name: Deploy to Webhuset
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: webhuset-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          tools: composer:v2
+
+      - name: Install production dependencies
+        run: composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+
+      - name: Install sshpass when using password auth
+        if: ${{ secrets.WEBHUSET_PASSWORD != '' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sshpass
+
+      - name: Prepare SSH
+        env:
+          WEBHUSET_HOST: ${{ secrets.WEBHUSET_HOST }}
+          WEBHUSET_KNOWN_HOSTS: ${{ secrets.WEBHUSET_KNOWN_HOSTS }}
+          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD }}
+          WEBHUSET_PORT: ${{ secrets.WEBHUSET_PORT }}
+          WEBHUSET_SSH_KEY: ${{ secrets.WEBHUSET_SSH_KEY }}
+          WEBHUSET_USERNAME: ${{ secrets.WEBHUSET_USERNAME }}
+        run: |
+          set -eu
+          : "${WEBHUSET_HOST:?Missing WEBHUSET_HOST secret}"
+          : "${WEBHUSET_USERNAME:?Missing WEBHUSET_USERNAME secret}"
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          if [ -n "${WEBHUSET_SSH_KEY:-}" ]; then
+            printf '%s\n' "$WEBHUSET_SSH_KEY" > ~/.ssh/id_ed25519
+            chmod 600 ~/.ssh/id_ed25519
+          elif [ -z "${WEBHUSET_PASSWORD:-}" ]; then
+            echo "Missing WEBHUSET_SSH_KEY or WEBHUSET_PASSWORD secret"
+            exit 1
+          fi
+
+          if [ -n "${WEBHUSET_KNOWN_HOSTS:-}" ]; then
+            printf '%s\n' "$WEBHUSET_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -p "${WEBHUSET_PORT:-22}" -H "$WEBHUSET_HOST" >> ~/.ssh/known_hosts
+          fi
+
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Ensure remote path exists
+        env:
+          WEBHUSET_HOST: ${{ secrets.WEBHUSET_HOST }}
+          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD }}
+          WEBHUSET_PORT: ${{ secrets.WEBHUSET_PORT }}
+          WEBHUSET_REMOTE_PATH: ${{ secrets.WEBHUSET_REMOTE_PATH }}
+          WEBHUSET_SSH_KEY: ${{ secrets.WEBHUSET_SSH_KEY }}
+          WEBHUSET_USERNAME: ${{ secrets.WEBHUSET_USERNAME }}
+        run: |
+          set -eu
+          : "${WEBHUSET_REMOTE_PATH:?Missing WEBHUSET_REMOTE_PATH secret}"
+
+          if [ -z "${WEBHUSET_SSH_KEY:-}" ] && [ -n "${WEBHUSET_PASSWORD:-}" ]; then
+            sshpass -p "${WEBHUSET_PASSWORD}" \
+              ssh -p "${WEBHUSET_PORT:-22}" \
+              "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}" \
+              "mkdir -p '${WEBHUSET_REMOTE_PATH}'"
+          else
+            ssh -p "${WEBHUSET_PORT:-22}" \
+              "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}" \
+              "mkdir -p '${WEBHUSET_REMOTE_PATH}'"
+          fi
+
+      - name: Sync files to Webhuset
+        env:
+          WEBHUSET_HOST: ${{ secrets.WEBHUSET_HOST }}
+          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD }}
+          WEBHUSET_PORT: ${{ secrets.WEBHUSET_PORT }}
+          WEBHUSET_REMOTE_PATH: ${{ secrets.WEBHUSET_REMOTE_PATH }}
+          WEBHUSET_SSH_KEY: ${{ secrets.WEBHUSET_SSH_KEY }}
+          WEBHUSET_USERNAME: ${{ secrets.WEBHUSET_USERNAME }}
+        run: |
+          set -eu
+
+          if [ -z "${WEBHUSET_SSH_KEY:-}" ] && [ -n "${WEBHUSET_PASSWORD:-}" ]; then
+            sshpass -p "${WEBHUSET_PASSWORD}" \
+              rsync \
+              --archive \
+              --compress \
+              --delete \
+              --human-readable \
+              --itemize-changes \
+              --exclude-from=".github/rsync-exclude.txt" \
+              -e "ssh -p ${WEBHUSET_PORT:-22}" \
+              ./ \
+              "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}:${WEBHUSET_REMOTE_PATH}"
+          else
+            rsync \
+              --archive \
+              --compress \
+              --delete \
+              --human-readable \
+              --itemize-changes \
+              --exclude-from=".github/rsync-exclude.txt" \
+              -e "ssh -p ${WEBHUSET_PORT:-22}" \
+              ./ \
+              "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}:${WEBHUSET_REMOTE_PATH}"
+          fi

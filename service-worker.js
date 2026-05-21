@@ -1,6 +1,6 @@
 /* Værvakt PWA – Service Worker for offline caching */
 
-const CACHE_VERSION = 'vaervakt-pwa-v11';
+const CACHE_VERSION = 'vaervakt-pwa-v12';
 const PRECACHE_URLS = [
   '/',
   '/index.php',

@@ -36,8 +36,9 @@ $current_icon = $icons[$latest['weather_icon']] ?? 'cloud';
 <html lang="no">
 <head>
     <meta charset="UTF-8">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="assets/css/tailwind.css">
+    <link rel="stylesheet" href="assets/css/app.css">
+    <script src="assets/vendor/lucide/lucide.min.js"></script>
     <style>
         body { background: transparent !important; overflow: hidden; font-family: 'Inter', sans-serif; margin: 0; padding: 10px; }
         

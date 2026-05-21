@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Om Værvakt</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="assets/css/tailwind.css">
+    <link rel="stylesheet" href="assets/css/app.css">
+    <script src="assets/vendor/lucide/lucide.min.js"></script>
     <style>body { background-color: #0b0f1a; color: white; margin-bottom: 90px; }</style>
 </head>
 <body class="p-8 max-w-xl mx-auto">

@@ -37,11 +37,13 @@ if (!$table) {
     exit;
 }
 
-// Haversine-formel i SQL for å finne målinger i nærheten
+// Haversine-formel i SQL for å finne målinger i nærheten.
+// Bruk unike placeholders: enkelte PDO-drivere feiler når samme named parameter
+// gjenbrukes flere ganger i en prepared statement.
 $sql = "SELECT " . implode(', ', $selectCols) . ", $latCol AS latitude, $lonCol AS longitude,
     (6371 * acos(
-        cos(radians(:lat)) * cos(radians($latCol)) * cos(radians($lonCol) - radians(:lon)) +
-        sin(radians(:lat)) * sin(radians($latCol))
+        cos(radians(:lat_cos)) * cos(radians($latCol)) * cos(radians($lonCol) - radians(:lon)) +
+        sin(radians(:lat_sin)) * sin(radians($latCol))
     )) AS distance
     FROM $table
     WHERE $latCol IS NOT NULL AND $lonCol IS NOT NULL
@@ -51,7 +53,12 @@ $sql = "SELECT " . implode(', ', $selectCols) . ", $latCol AS latitude, $lonCol 
 
 try {
     $stmt = $pdo->prepare($sql);
-    $stmt->execute([':lat' => $lat, ':lon' => $lon, ':radius' => $radius]);
+    $stmt->execute([
+        ':lat_cos' => $lat,
+        ':lat_sin' => $lat,
+        ':lon' => $lon,
+        ':radius' => $radius,
+    ]);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     echo json_encode(array_values($rows));
 } catch (Exception $e) {

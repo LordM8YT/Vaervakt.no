@@ -553,13 +553,24 @@ try {
 
         const SUBMIT_DEFAULT_LABEL = 'Send værrapport';
 
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
-            .then(reg => {
-                console.log('SW registrert:', reg);
-                console.log('SW aktiv:', reg.active && reg.active.scriptURL);
-            })
-            .catch(err => console.error('SW-registrering feilet:', err));
+        let serviceWorkerRegistrationPromise = null;
+
+        function getServiceWorkerRegistration() {
+            if (!('serviceWorker' in navigator)) {
+                return Promise.reject(new Error('Service Worker ikke støttet'));
+            }
+
+            if (!serviceWorkerRegistrationPromise) {
+                serviceWorkerRegistrationPromise = navigator.serviceWorker
+                    .register('/service-worker.js', { scope: '/' })
+                    .then((registration) => navigator.serviceWorker.ready.then(() => registration))
+                    .catch((error) => {
+                        serviceWorkerRegistrationPromise = null;
+                        throw error;
+                    });
+            }
+
+            return serviceWorkerRegistrationPromise;
         }
 
         function escapeHtml(value) {
@@ -832,25 +843,73 @@ try {
             }
         }
 
-        async function syncPushUi() {
+        function setPushUiState(state, message) {
             const pushBtn = document.getElementById('pushBtn');
             const pushStatus = document.getElementById('pushStatus');
-            if (!pushBtn || !pushStatus || !PUSH_NOTIFICATIONS_READY || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+            if (!pushBtn || !pushStatus) return;
+
+            const disabled = state === 'active' || state === 'unsupported' || state === 'busy' || state === 'denied';
+            pushBtn.disabled = disabled;
+            pushBtn.classList.toggle('bg-sky-500', !disabled);
+            pushBtn.classList.toggle('bg-slate-800', disabled);
+            pushBtn.classList.toggle('text-slate-400', disabled);
+            pushBtn.classList.toggle('cursor-not-allowed', disabled);
+
+            if (state === 'active') {
+                pushBtn.textContent = 'Varsler aktivert';
+                pushStatus.textContent = 'Push-varsler: abonnert';
+                return;
+            }
+            if (state === 'busy') {
+                pushBtn.textContent = 'Aktiverer...';
+                pushStatus.textContent = 'Push-varsler: aktiverer';
+                return;
+            }
+            if (state === 'denied') {
+                pushBtn.textContent = 'Varsler blokkert';
+                pushStatus.textContent = message || 'Push-varsler: blokkert i nettleseren';
+                return;
+            }
+            if (state === 'unsupported') {
+                pushBtn.textContent = 'Push ikke støttet';
+                pushStatus.textContent = message || 'Push-varsler: ikke støttet';
+                return;
+            }
+
+            pushBtn.textContent = 'Aktiver varsler';
+            pushStatus.textContent = message || 'Push-varsler: ikke abonnert';
+        }
+
+        async function syncPushUi() {
+            if (!PUSH_NOTIFICATIONS_READY || !('PushManager' in window)) {
+                setPushUiState('unsupported', PUSH_NOTIFICATIONS_READY ? 'Push-varsler: ikke støttet' : 'Push-varsler: kommer snart');
                 return;
             }
 
             try {
-                const reg = await navigator.serviceWorker.ready;
+                const reg = await getServiceWorkerRegistration();
                 const existing = await reg.pushManager.getSubscription();
                 if (existing) {
-                    pushStatus.textContent = 'Push-varsler: abonnert';
-                    pushBtn.textContent = 'Varsler aktivert';
-                    pushBtn.disabled = true;
-                    pushBtn.classList.add('bg-slate-800', 'text-slate-400', 'cursor-not-allowed');
-                    pushBtn.classList.remove('bg-sky-500');
+                    setPushUiState('active');
+                    return;
                 }
+
+                if ('permissions' in navigator && typeof navigator.permissions.query === 'function') {
+                    try {
+                        const permission = await navigator.permissions.query({ name: 'notifications' });
+                        if (permission.state === 'denied') {
+                            setPushUiState('denied');
+                            return;
+                        }
+                    } catch (permissionError) {
+                        // Enkelte nettlesere støtter PushManager uten Permissions API for notifications.
+                    }
+                }
+
+                setPushUiState('ready');
             } catch (error) {
                 console.warn('Kunne ikke lese push-status:', error);
+                setPushUiState('unsupported', 'Push-varsler: kunne ikke klargjøres');
             }
         }
 
@@ -1301,8 +1360,8 @@ try {
             });
 
             const pushBtn = document.getElementById('pushBtn');
-            if (pushBtn && PUSH_NOTIFICATIONS_READY) {
-                pushBtn.addEventListener('click', registerPush);
+            if (pushBtn) {
+                pushBtn.onclick = PUSH_NOTIFICATIONS_READY ? registerPush : null;
             }
 
             const installBtn = document.getElementById('installBtn');
@@ -1326,35 +1385,110 @@ try {
         window.addEventListener('online', () => { sendQueuedReports(); updateQueueUI(); });
 
         function urlBase64ToUint8Array(base64String) {
-            const padding = '='.repeat((4 - base64String.length % 4) % 4);
-            const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-            const rawData = window.atob(base64);
-            const outputArray = new Uint8Array(rawData.length);
-            for (let i = 0; i < rawData.length; ++i) {
-                outputArray[i] = rawData.charCodeAt(i);
+            const normalized = String(base64String || '').trim().replace(/\s/g, '');
+            if (!normalized) {
+                throw new Error('Mangler VAPID public key');
             }
-            return outputArray;
+
+            const remainder = normalized.length % 4;
+            if (remainder === 1) {
+                throw new Error('Ugyldig VAPID public key-lengde');
+            }
+
+            const padding = '='.repeat((4 - remainder) % 4);
+            const base64 = (normalized + padding).replace(/-/g, '+').replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            return Uint8Array.from(rawData, (char) => char.charCodeAt(0));
         }
 
-        async function registerPush() {
-            if (!PUSH_NOTIFICATIONS_READY) {
-                return showToast('Push-varsler blir aktivert når oppsettet er klart.');
+        async function getPushPermissionState(registration, subscribeOptions) {
+            if (registration.pushManager && typeof registration.pushManager.permissionState === 'function') {
+                return registration.pushManager.permissionState(subscribeOptions);
             }
-            if (!('serviceWorker' in navigator) || !('PushManager' in window)) { return showToast('Push ikke støttet i denne nettleseren'); }
-            const reg = await navigator.serviceWorker.ready;
-            const existing = await reg.pushManager.getSubscription();
-            if (existing) { document.getElementById('pushStatus').textContent = 'Push-varsler: abonnert'; return showToast('Allerede abonnert'); }
-            try {
-                const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC) });
-                const res = await fetch('subscriptions.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscription: sub }) });
-                if (res.ok) {
-                    document.getElementById('pushStatus').textContent = 'Push-varsler: abonnert';
-                    document.getElementById('pushBtn').disabled = true;
-                    showToast('Abonnert på push-varsler');
-                } else {
-                    showToast('Kunne ikke lagre abonnement');
+
+            if (typeof Notification !== 'undefined' && Notification.permission) {
+                return Notification.permission === 'default' ? 'prompt' : Notification.permission;
+            }
+
+            return 'prompt';
+        }
+
+        async function ensurePushPermission(registration, subscribeOptions) {
+            let state = await getPushPermissionState(registration, subscribeOptions);
+            if (state === 'default') state = 'prompt';
+            if (state === 'denied') return state;
+
+            if (state === 'prompt' && typeof Notification !== 'undefined' && typeof Notification.requestPermission === 'function') {
+                state = await Notification.requestPermission();
+                if (state === 'default') state = 'prompt';
+            }
+
+            return state;
+        }
+
+        let pushSubscriptionInFlight = null;
+
+        async function registerPush() {
+            if (pushSubscriptionInFlight) {
+                return pushSubscriptionInFlight;
+            }
+
+            pushSubscriptionInFlight = (async () => {
+                if (!PUSH_NOTIFICATIONS_READY) {
+                    showToast('Push-varsler blir aktivert når oppsettet er klart.');
+                    return;
                 }
-            } catch (e) { console.error(e); showToast('Abonnement feilet'); }
+                if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+                    setPushUiState('unsupported');
+                    showToast('Push ikke støttet i denne nettleseren');
+                    return;
+                }
+
+                setPushUiState('busy');
+
+                try {
+                    const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC);
+                    const subscribeOptions = { userVisibleOnly: true, applicationServerKey };
+                    const reg = await getServiceWorkerRegistration();
+                    const existing = await reg.pushManager.getSubscription();
+                    if (existing) {
+                        setPushUiState('active');
+                        showToast('Allerede abonnert');
+                        return;
+                    }
+
+                    const permissionState = await ensurePushPermission(reg, subscribeOptions);
+                    if (permissionState !== 'granted') {
+                        setPushUiState(permissionState === 'denied' ? 'denied' : 'ready');
+                        showToast(permissionState === 'denied' ? 'Push-varsler er blokkert i nettleseren' : 'Push-varsler ble ikke tillatt');
+                        return;
+                    }
+
+                    const sub = await reg.pushManager.subscribe(subscribeOptions);
+                    const res = await fetch('subscriptions.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({ subscription: sub }),
+                    });
+
+                    if (res.ok) {
+                        setPushUiState('active');
+                        showToast('Abonnert på push-varsler');
+                    } else {
+                        setPushUiState('ready');
+                        showToast('Kunne ikke lagre abonnement');
+                    }
+                } catch (error) {
+                    console.error('Push-abonnement feilet:', error);
+                    setPushUiState('ready');
+                    showToast('Abonnement feilet');
+                }
+            })().finally(() => {
+                pushSubscriptionInFlight = null;
+            });
+
+            return pushSubscriptionInFlight;
         }
     </script>
         <?php $forecastJson = isset($data) ? $data : null; ?>

@@ -1,16 +1,27 @@
 /* Værvakt PWA – Service Worker for offline caching */
 
-const CACHE_VERSION = 'vaervakt-pwa-v10';
+const CACHE_VERSION = 'vaervakt-pwa-v11';
 const PRECACHE_URLS = [
   '/',
   '/index.php',
   '/manifest.json',
   '/service-worker.js',
-  '/icons/vaervakt-icon.svg'
+  '/icons/vaervakt-icon.svg',
+  '/assets/css/tailwind.css',
+  '/assets/css/app.css',
+  '/assets/js/app-core.js',
+  '/assets/js/pwa-push.js',
+  '/assets/js/map.js',
+  '/assets/vendor/lucide/lucide.min.js',
+  '/assets/vendor/leaflet/leaflet.css',
+  '/assets/vendor/leaflet/leaflet.js',
+  '/assets/vendor/leaflet.markercluster/MarkerCluster.css',
+  '/assets/vendor/leaflet.markercluster/MarkerCluster.Default.css',
+  '/assets/vendor/leaflet.markercluster/leaflet.markercluster.js'
 ];
 
-const API_CACHE = 'vaervakt-api-v4';
-const STATIC_CACHE = 'vaervakt-static-v4';
+const API_CACHE = 'vaervakt-api-v5';
+const STATIC_CACHE = 'vaervakt-static-v5';
 const CACHEABLE_APIS = ['api.met.no'];
 
 // Installering og caching av kjernefiler
@@ -52,6 +63,22 @@ self.addEventListener('fetch', (event) => {
           return res;
         })
         .catch(() => caches.match(request).then((cached) => cached || caches.match('/index.php')))
+    );
+    return;
+  }
+
+  if (url.origin === self.location.origin && url.pathname.startsWith('/assets/')) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
+        return fetch(request).then((res) => {
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(STATIC_CACHE).then((c) => c.put(request, copy));
+          }
+          return res;
+        });
+      })
     );
     return;
   }

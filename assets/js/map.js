@@ -63,7 +63,10 @@ const forecastData = window.VAERVAKT_CONFIG?.forecastData || null;
                         map.addLayer(markerCluster);
                     }
                     if (panToMarker) {
-                        map.flyTo([parseFloat(normalizedReport.latitude), parseFloat(normalizedReport.longitude)], Math.max(map.getZoom(), 10), { duration: 0.6 });
+                        const markerLat = parseFloat(normalizedReport.latitude);
+                        const markerLon = parseFloat(normalizedReport.longitude);
+                        setTimeout(() => map.invalidateSize(), 80);
+                        map.flyTo([markerLat, markerLon], Math.max(map.getZoom(), 16), { duration: 0.6 });
                     }
                     if (noCoordsControl) {
                         map.removeControl(noCoordsControl);
@@ -97,7 +100,8 @@ const forecastData = window.VAERVAKT_CONFIG?.forecastData || null;
                         }
                         if (markerCluster.getLayers().length) {
                             if (!map.hasLayer(markerCluster)) map.addLayer(markerCluster);
-                            try { map.fitBounds(markerCluster.getBounds().pad(0.2)); } catch(e){}
+                            try { map.fitBounds(markerCluster.getBounds().pad(0.2), { maxZoom: 16 }); } catch(e){}
+                            setTimeout(() => map.invalidateSize(), 80);
                             if (noCoordsControl) {
                                 map.removeControl(noCoordsControl);
                                 noCoordsControl = null;

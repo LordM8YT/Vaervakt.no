@@ -368,6 +368,7 @@ try {
                 </div>
                 <input type="hidden" name="lat" id="formLat" value="<?= htmlspecialchars($_GET['lat'] ?? '') ?>">
                 <input type="hidden" name="lon" id="formLon" value="<?= htmlspecialchars($_GET['lon'] ?? '') ?>">
+                <input type="hidden" id="formAccuracy" value="">
                 <button id="submitBtn" type="submit" class="w-full bg-sky-500 hover:bg-sky-400 py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2">
                     <span id="submitText">Send værrapport</span>
                 </button>

@@ -184,8 +184,64 @@ lucide.createIcons();
                 }
                 navigator.geolocation.getCurrentPosition(resolve, reject, {
                     enableHighAccuracy: options.enableHighAccuracy ?? true,
-                    timeout: options.timeout ?? 7000,
-                    maximumAge: options.maximumAge ?? 120000,
+                    timeout: options.timeout ?? 10000,
+                    maximumAge: options.maximumAge ?? 0,
+                });
+            });
+        }
+
+        function formatCoordinate(value) {
+            const number = Number(value);
+            return Number.isFinite(number) ? number.toFixed(6) : '';
+        }
+
+        function formatAccuracyLabel(accuracy) {
+            const number = Number(accuracy);
+            if (!Number.isFinite(number)) return '';
+            return number < 1000 ? `±${Math.round(number)} m` : `±${(number / 1000).toFixed(1)} km`;
+        }
+
+        function getPositionAccuracy(pos) {
+            return Number(pos?.coords?.accuracy ?? Infinity);
+        }
+
+        async function requestBestPosition(options = {}) {
+            const desiredAccuracy = options.desiredAccuracy ?? 35;
+            const settleMs = options.settleMs ?? 6000;
+            const first = await requestCurrentPosition({
+                enableHighAccuracy: true,
+                timeout: options.timeout ?? 10000,
+                maximumAge: 0,
+            });
+
+            if (getPositionAccuracy(first) <= desiredAccuracy || typeof navigator.geolocation.watchPosition !== 'function') {
+                return first;
+            }
+
+            return new Promise((resolve) => {
+                let best = first;
+                let watchId = null;
+                const finish = () => {
+                    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+                    resolve(best);
+                };
+                const timer = setTimeout(finish, settleMs);
+
+                watchId = navigator.geolocation.watchPosition((pos) => {
+                    if (getPositionAccuracy(pos) < getPositionAccuracy(best)) {
+                        best = pos;
+                    }
+                    if (getPositionAccuracy(best) <= desiredAccuracy) {
+                        clearTimeout(timer);
+                        finish();
+                    }
+                }, () => {
+                    clearTimeout(timer);
+                    finish();
+                }, {
+                    enableHighAccuracy: true,
+                    timeout: settleMs,
+                    maximumAge: 0,
                 });
             });
         }
@@ -200,6 +256,9 @@ lucide.createIcons();
         function buildLocationLabel(address) {
             if (!address) return '';
             const primary = [
+                address.road,
+                address.pedestrian,
+                address.footway,
                 address.suburb,
                 address.neighbourhood,
                 address.neighborhood,
@@ -234,7 +293,7 @@ lucide.createIcons();
                 format: 'jsonv2',
                 lat: String(lat),
                 lon: String(lon),
-                zoom: '13',
+                zoom: '17',
                 'accept-language': preferredLanguage(),
             }).toString();
 
@@ -252,11 +311,14 @@ lucide.createIcons();
             const locInput = document.getElementById('locInput');
             const latInput = document.getElementById('formLat');
             const lonInput = document.getElementById('formLon');
+            const accuracyInput = document.getElementById('formAccuracy');
             const shouldUpdateField = options.updateField !== false;
             const shouldToast = options.toastOnSuccess === true;
+            const accuracyLabel = formatAccuracyLabel(options.accuracy);
 
-            if (latInput) latInput.value = lat;
-            if (lonInput) lonInput.value = lon;
+            if (latInput) latInput.value = formatCoordinate(lat);
+            if (lonInput) lonInput.value = formatCoordinate(lon);
+            if (accuracyInput) accuracyInput.value = accuracyLabel;
 
             try {
                 const label = await reverseGeocode(lat, lon);
@@ -264,39 +326,49 @@ lucide.createIcons();
                     locInput.value = label;
                 }
                 if (label) {
-                    setLocationAssist(`Fant ${label}.`, 'success');
+                    const suffix = accuracyLabel ? ` (${accuracyLabel})` : '';
+                    setLocationAssist(`Fant ${label}${suffix}.`, 'success');
                     if (shouldToast) showToast('Sted oppdatert');
                 } else {
-                    setLocationAssist('Fant posisjon, men ikke sted. Du kan skrive stedet manuelt.', 'warning');
+                    const suffix = accuracyLabel ? ` Nøyaktighet: ${accuracyLabel}.` : '';
+                    setLocationAssist(`Fant posisjon, men ikke sted.${suffix} Du kan skrive stedet manuelt.`, 'warning');
                 }
                 return label;
             } catch (error) {
                 console.warn('Reverse geocoding feilet:', error);
-                setLocationAssist('Fant posisjon, men ikke sted. Du kan skrive stedet manuelt.', 'warning');
+                const suffix = accuracyLabel ? ` Nøyaktighet: ${accuracyLabel}.` : '';
+                setLocationAssist(`Fant posisjon, men ikke sted.${suffix} Du kan skrive stedet manuelt.`, 'warning');
                 return '';
             }
+        }
+
+        function refreshMapAroundPosition(lat, lon, options = {}) {
+            const map = window.__vaervakt_map;
+            if (!map) return;
+            const zoom = Math.max(map.getZoom(), options.zoom ?? 15);
+            setTimeout(() => map.invalidateSize(), 80);
+            map.setView([lat, lon], zoom, { animate: true });
         }
 
         async function handleUseCurrentLocation() {
             const button = document.getElementById('useLocationBtn');
             if (button) button.disabled = true;
-            setLocationAssist('Henter posisjon …', 'neutral');
+            setLocationAssist('Henter presis posisjon …', 'neutral');
 
             try {
-                const pos = await requestCurrentPosition({ timeout: 8000, enableHighAccuracy: true });
+                const pos = await requestBestPosition({ timeout: 12000, settleMs: 7000, desiredAccuracy: 30 });
                 const lat = pos.coords.latitude;
                 const lon = pos.coords.longitude;
-                await hydrateLocationFromCoords(lat, lon, { updateField: true, toastOnSuccess: true });
-                if (window.__vaervakt_map) {
-                    window.__vaervakt_map.setView([lat, lon], 11);
-                }
+                const accuracy = pos.coords.accuracy;
+                await hydrateLocationFromCoords(lat, lon, { updateField: true, toastOnSuccess: true, accuracy });
+                refreshMapAroundPosition(lat, lon, { zoom: 16 });
                 if (typeof window.fetchReportsNearby === 'function') {
-                    window.fetchReportsNearby(lat, lon);
+                    window.fetchReportsNearby(formatCoordinate(lat), formatCoordinate(lon), 10);
                 }
                 setFeedStatus('Ser på området ditt', 'neutral', { autoReset: false });
                 const url = new URL(window.location.href);
-                url.searchParams.set('lat', lat);
-                url.searchParams.set('lon', lon);
+                url.searchParams.set('lat', formatCoordinate(lat));
+                url.searchParams.set('lon', formatCoordinate(lon));
                 window.history.replaceState({}, '', url.toString());
             } catch (error) {
                 const message = getFriendlyGeolocationError(error);
@@ -409,6 +481,7 @@ lucide.createIcons();
             const formStartedAtInput = form.querySelector('input[name="form_started_at"]');
             const latInput = document.getElementById('formLat');
             const lonInput = document.getElementById('formLon');
+            const accuracyInput = document.getElementById('formAccuracy');
             const user = userInput.value.trim();
             const weather = weatherInput.value;
             const temp = tempInput.value;
@@ -421,20 +494,29 @@ lucide.createIcons();
                 return;
             }
 
-            if ((!latInput.value || !lonInput.value) && navigator.geolocation) {
+            if (navigator.geolocation) {
                 try {
-                    const pos = await requestCurrentPosition({ timeout: 5000, enableHighAccuracy: false });
-                    await hydrateLocationFromCoords(pos.coords.latitude, pos.coords.longitude, { updateField: !loc, toastOnSuccess: false });
+                    setLocationAssist('Oppdaterer presis posisjon før innsending …', 'neutral');
+                    const pos = await requestBestPosition({ timeout: 9000, settleMs: 5000, desiredAccuracy: 35 });
+                    await hydrateLocationFromCoords(pos.coords.latitude, pos.coords.longitude, {
+                        updateField: !loc,
+                        toastOnSuccess: false,
+                        accuracy: pos.coords.accuracy,
+                    });
+                    refreshMapAroundPosition(pos.coords.latitude, pos.coords.longitude, { zoom: 16 });
                     loc = locInput.value.trim();
                 } catch (error) {
-                    if (!loc) {
-                        const message = getFriendlyGeolocationError(error);
-                        setLocationAssist(message, 'error');
-                        showToast(message);
-                        setFeedStatus('Posisjon mangler', 'warning');
-                        resetSubmitButton();
-                        return;
+                    if (!latInput.value || !lonInput.value || !loc) {
+                        if (!loc) {
+                            const message = getFriendlyGeolocationError(error);
+                            setLocationAssist(message, 'error');
+                            showToast(message);
+                            setFeedStatus('Posisjon mangler', 'warning');
+                            resetSubmitButton();
+                            return;
+                        }
                     }
+                    setLocationAssist('Bruker sist kjente posisjon i skjemaet. Trykk «Bruk min posisjon» for å prøve igjen.', 'warning');
                 }
             }
 
@@ -486,12 +568,14 @@ lucide.createIcons();
                     const preservedLocation = loc;
                     const preservedLat = latInput ? latInput.value : '';
                     const preservedLon = lonInput ? lonInput.value : '';
+                    const preservedAccuracy = accuracyInput ? accuracyInput.value : '';
 
                     form.reset();
                     userInput.value = preservedUser;
                     locInput.value = preservedLocation;
                     if (latInput) latInput.value = preservedLat;
                     if (lonInput) lonInput.value = preservedLon;
+                    if (accuracyInput) accuracyInput.value = preservedAccuracy;
                     weatherInput.value = '';
                     tempInput.value = '';
                     stampReportFormStart();
@@ -603,7 +687,8 @@ lucide.createIcons();
                         clearResults();
                         if (it.lat && it.lon) {
                             if (window.__vaervakt_map) {
-                                window.__vaervakt_map.setView([parseFloat(it.lat), parseFloat(it.lon)], 12);
+                                window.__vaervakt_map.setView([parseFloat(it.lat), parseFloat(it.lon)], 16);
+                                setTimeout(() => window.__vaervakt_map.invalidateSize(), 80);
                             } else {
                                 window.location.href = `index.php?lat=${it.lat}&lon=${it.lon}`;
                                 return;

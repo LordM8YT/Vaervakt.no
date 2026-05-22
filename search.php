@@ -16,6 +16,8 @@ $u = 'https://nominatim.openstreetmap.org/search?' . http_build_query([
     'format' => 'jsonv2',
     'q' => $q,
     'addressdetails' => 1,
+    'countrycodes' => 'no',
+    'accept-language' => 'nb-NO,nb;q=0.9,en;q=0.6',
     'limit' => $limit,
 ]);
 

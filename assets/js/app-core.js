@@ -21,38 +21,8 @@ lucide.createIcons();
             }
         }
 
-
-        function openReportSheet() {
-            const sheet = document.getElementById('reportSheet');
-            const backdrop = document.getElementById('reportSheetBackdrop');
-            const trigger = document.getElementById('openReportSheetBtn');
-            if (!sheet) return;
-            sheet.classList.add('is-open');
-            sheet.setAttribute('aria-hidden', 'false');
-            if (backdrop) backdrop.hidden = false;
-            if (trigger) trigger.setAttribute('aria-expanded', 'true');
-            document.documentElement.style.overflow = 'hidden';
-            document.body.style.overflow = 'hidden';
-        }
-
-        function closeReportSheet() {
-            const sheet = document.getElementById('reportSheet');
-            const backdrop = document.getElementById('reportSheetBackdrop');
-            const trigger = document.getElementById('openReportSheetBtn');
-            if (!sheet) return;
-            sheet.classList.remove('is-open');
-            sheet.setAttribute('aria-hidden', 'true');
-            if (backdrop) backdrop.hidden = true;
-            if (trigger) trigger.setAttribute('aria-expanded', 'false');
-            if (!document.querySelector('.modal.active')) {
-                document.documentElement.style.overflow = '';
-                document.body.style.overflow = '';
-            }
-        }
-
         document.addEventListener('keydown', (event) => {
             if (event.key !== 'Escape') return;
-            closeReportSheet();
             document.querySelectorAll('.modal.active').forEach((modal) => {
                 modal.classList.remove('active');
                 modal.setAttribute('aria-hidden', 'true');
@@ -124,16 +94,17 @@ lucide.createIcons();
             const createdAt = report.created_at || new Date().toISOString();
 
             return `
-                <article class="obs-item vv-report-row" data-type="${escapeHtml(type)}">
-                    <div class="vv-report-main">
-                        <div class="vv-report-emoji" aria-hidden="true">${getWeatherEmoji(type)}</div>
+                <div class="obs-item flex items-center justify-between gap-4 bg-slate-950/30 p-4 rounded-2xl border border-white/5" data-type="${escapeHtml(type)}">
+                    <div class="flex min-w-0 items-center gap-4 text-left">
+                        <div class="text-3xl leading-none" aria-hidden="true">${getWeatherEmoji(type)}</div>
                         <div class="min-w-0">
-                            <p class="vv-report-user">${escapeHtml(username)}</p>
-                            <p class="vv-report-location">${escapeHtml(location)} · ${escapeHtml(formatRelativeTimeLabel(createdAt))}</p>
+                            <p class="text-[10px] uppercase font-black tracking-[0.16em] text-slate-500">${escapeHtml(formatRelativeTimeLabel(createdAt))}</p>
+                            <p class="truncate text-sm font-bold">${escapeHtml(username)} i ${escapeHtml(location)}</p>
+                            <p class="text-[10px] uppercase font-black text-sky-400">${escapeHtml(type)}</p>
                         </div>
                     </div>
-                    <div class="vv-report-temp"><strong>${Math.round(Number.isFinite(temperature) ? temperature : 0)}°</strong><span>${escapeHtml(type)}</span></div>
-                </article>
+                    <div class="shrink-0 text-right font-black italic text-xl">${Math.round(Number.isFinite(temperature) ? temperature : 0)}°</div>
+                </div>
             `;
         }
 
@@ -144,7 +115,7 @@ lucide.createIcons();
             if (empty) empty.remove();
             list.insertAdjacentHTML('afterbegin', renderObservationCard(report));
             if (!document.getElementById('emptyFilterMsg')) {
-                list.insertAdjacentHTML('beforeend', '<p id="emptyFilterMsg" class="vv-empty-state" style="display: none;">Ingen kritiske forhold rapportert akkurat nå...</p>');
+                list.insertAdjacentHTML('beforeend', '<p id="emptyFilterMsg" class="text-xs text-slate-500 italic py-4 text-center" style="display: none;">Ingen kritiske forhold rapportert akkurat nå...</p>');
             }
             const fresh = list.querySelector('.obs-item');
             if (fresh) {
@@ -180,13 +151,12 @@ lucide.createIcons();
             const el = document.getElementById('locationAssistText');
             if (!el) return;
             const tones = {
-                neutral: 'rgba(255,255,255,0.52)',
-                success: '#a7f3d0',
-                warning: '#fde68a',
-                error: '#fda4af',
+                neutral: 'text-slate-300',
+                success: 'text-emerald-300',
+                warning: 'text-amber-300',
+                error: 'text-rose-300',
             };
-            el.className = 'status-hint';
-            el.style.color = tones[tone] || tones.neutral;
+            el.className = `status-hint mt-1 text-sm ${tones[tone] || tones.neutral}`;
             el.textContent = message;
         }
 
@@ -527,7 +497,6 @@ lucide.createIcons();
                     stampReportFormStart();
 
                     showToast('Værrapport sendt');
-                    closeReportSheet();
                     setFeedStatus('Ny rapport sendt', 'success');
                     setLocationAssist(preservedLocation ? `Klar med ${preservedLocation}.` : 'Trykk for å hente sted automatisk, også utenfor Norge.', preservedLocation ? 'success' : 'neutral');
                     resetSubmitButton();
@@ -559,7 +528,6 @@ lucide.createIcons();
                 try {
                     await addToOutbox(report);
                     showToast('Ingen nett. Rapporten ligger i kø og sendes automatisk ved tilkobling.');
-                    closeReportSheet();
                     setFeedStatus('Lagret offline', 'warning');
                     updateQueueUI();
                 } catch (e) {
@@ -596,46 +564,19 @@ lucide.createIcons();
             });
 
             if (mode === 'vann') {
-                title.innerText = "Flom/Snø";
+                title.innerText = "Varslede vann- & snøforhold";
                 resetBtn.classList.remove('hidden');
-                navVann && navVann.classList.add('is-active');
-                navAll && navAll.classList.remove('is-active');
+                navVann.classList.replace('text-slate-500', 'text-sky-400');
+                navAll.classList.replace('text-sky-400', 'text-slate-500');
                 if (emptyMsg) emptyMsg.style.display = (found === 0) ? 'block' : 'none';
             } else {
-                title.innerText = "Lokale rapporter";
+                title.innerText = "Siste observasjoner";
                 resetBtn.classList.add('hidden');
-                navAll && navAll.classList.add('is-active');
-                navVann && navVann.classList.remove('is-active');
+                navAll.classList.replace('text-slate-500', 'text-sky-400');
+                navVann.classList.replace('text-sky-400', 'text-slate-500');
                 if (emptyMsg) emptyMsg.style.display = 'none';
             }
         }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            const openBtn = document.getElementById('openReportSheetBtn');
-            const closeBtn = document.getElementById('closeReportSheetBtn');
-            const backdrop = document.getElementById('reportSheetBackdrop');
-            if (openBtn) openBtn.addEventListener('click', openReportSheet);
-            if (closeBtn) closeBtn.addEventListener('click', closeReportSheet);
-            if (backdrop) backdrop.addEventListener('click', closeReportSheet);
-
-            const weatherInput = document.getElementById('weatherInput');
-            const conditionButtons = document.querySelectorAll('[data-weather-value]');
-            const syncConditionButtons = () => {
-                conditionButtons.forEach((button) => {
-                    button.classList.toggle('is-selected', weatherInput && weatherInput.value === button.dataset.weatherValue);
-                });
-            };
-            conditionButtons.forEach((button) => {
-                button.addEventListener('click', () => {
-                    if (!weatherInput) return;
-                    weatherInput.value = button.dataset.weatherValue || '';
-                    weatherInput.dispatchEvent(new Event('change', { bubbles: true }));
-                    syncConditionButtons();
-                });
-            });
-            if (weatherInput) weatherInput.addEventListener('change', syncConditionButtons);
-            syncConditionButtons();
-        });
 
         (function(){
             const input = document.getElementById('placeSearch');
@@ -650,13 +591,7 @@ lucide.createIcons();
                     const el = document.createElement('button');
                     el.type = 'button';
                     el.className = 'w-full text-left p-3 hover:bg-white/10 border-b border-white/5';
-                    const title = document.createElement('div');
-                    title.className = 'text-sm font-semibold';
-                    title.textContent = it.display || '';
-                    const meta = document.createElement('div');
-                    meta.className = 'text-[11px] text-slate-400';
-                    meta.textContent = `${it.type || ''} ${it.class || ''}`.trim();
-                    el.append(title, meta);
+                    el.innerHTML = `<div class="text-sm font-semibold">${it.display}</div><div class="text-[11px] text-slate-400">${it.type||''} ${it.class||''}</div>`;
                     el.addEventListener('click', ()=>{
                         input.value = it.display;
                         const locInput = document.getElementById('locInput');

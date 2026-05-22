@@ -225,6 +225,9 @@ try {
     <meta name="theme-color" content="#0b0f1a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <title>Værvakt.no</title>
     
     <link rel="manifest" href="manifest.json">
@@ -234,7 +237,7 @@ try {
     <link rel="stylesheet" href="assets/vendor/leaflet.markercluster/MarkerCluster.css">
     <link rel="stylesheet" href="assets/vendor/leaflet.markercluster/MarkerCluster.Default.css">
 </head>
-<body class="flex flex-col">
+<body class="vaervakt-body flex flex-col">
 
     <div id="infoModal" class="modal p-6" onclick="closeModal('infoModal')" aria-hidden="true">
         <div class="glass-card p-10 rounded-[2.5rem] max-w-sm w-full text-center" onclick="event.stopPropagation()">
@@ -283,29 +286,32 @@ try {
     </div>
     <?php endif; ?>
 
-    <header class="p-6 text-center flex flex-col items-center">
+    <div class="app-shell">
+    <header class="app-header p-6 text-center flex flex-col items-center">
+        <p class="app-kicker">Lokal vaerpuls</p>
         <h1 class="text-3xl font-black tracking-tighter text-sky-400 italic uppercase mb-4">VÆRVAKT.NO</h1>
+        <p class="app-subtitle">Folkedrevet vaer, kart og observasjoner rundt deg.</p>
         <div class="w-full max-w-xl">
-            <div class="relative mb-4">
+            <div class="search-shell relative mb-4">
                 <input id="placeSearch" type="search" placeholder="Søk på sted eller koordinater" class="w-full p-3 rounded-2xl text-sm" aria-label="Søk sted">
                 <div id="searchResults" class="absolute left-0 right-0 mt-2 bg-white/5 backdrop-blur rounded-xl max-h-60 overflow-auto" style="display:none; z-index:1100;"></div>
             </div>
         </div>
-        <div class="glass-card bg-slate-900/40 border border-white/5 px-6 py-6 rounded-[1.5rem] w-full text-center">
+        <div class="toolbar-card glass-card bg-slate-900/40 border border-white/5 px-6 py-6 rounded-[1.5rem] w-full text-center">
             <p id="pushStatus" class="text-slate-300 text-xs tracking-wide"><?= $pushReady ? 'Push-varsler: ikke abonnert' : 'Push-varsler: kommer snart' ?></p>
             <div class="flex flex-wrap gap-3 justify-center mt-3">
-                <button id="pushBtn" <?= $pushReady ? '' : 'disabled' ?> class="<?= $pushReady ? 'bg-sky-500' : 'bg-slate-800 text-slate-400 cursor-not-allowed' ?> px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-widest"><?= $pushReady ? 'Aktiver varsler' : 'Varsler kommer snart' ?></button>
-                <button id="installBtn" class="hidden bg-slate-700 px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-widest">Installer app</button>
+                <button id="pushBtn" <?= $pushReady ? '' : 'disabled' ?> class="app-chip-button <?= $pushReady ? 'bg-sky-500' : 'bg-slate-800 text-slate-400 cursor-not-allowed' ?> px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-widest"><?= $pushReady ? 'Aktiver varsler' : 'Varsler kommer snart' ?></button>
+                <button id="installBtn" class="app-chip-button hidden bg-slate-700 px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-widest">Installer app</button>
                 <?php if ($patchnotes): ?>
-                    <button type="button" onclick="openModal('patchnotesModal')" class="bg-slate-800 px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-widest">Patchnotes</button>
+                    <button type="button" onclick="openModal('patchnotesModal')" class="app-chip-button bg-slate-800 px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-widest">Patchnotes</button>
                 <?php endif; ?>
-                <button id="shareBtn" class="bg-slate-800 px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-widest">Del appen</button>
+                <button id="shareBtn" class="app-chip-button bg-slate-800 px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-widest">Del appen</button>
             </div>
         </div>
     </header>
 
-    <main class="px-4 max-w-4xl mx-auto space-y-6 flex-1 pb-40 w-full">
-        <div class="glass-card p-8 rounded-[2.5rem] flex items-center justify-around shadow-2xl">
+    <main class="app-main px-4 max-w-4xl mx-auto space-y-6 flex-1 pb-40 w-full">
+        <div class="hero-card glass-card p-8 rounded-[2.5rem] flex items-center justify-around shadow-2xl">
             <div id="weatherIcon" style="min-width: 80px; display: flex; align-items: center; justify-content: center;">
                 <?php if ($api_error): ?>
                     <span class="spinner"></span>
@@ -319,11 +325,21 @@ try {
             </div>
         </div>
 
-        <div id="mapContainer" class="map-glow rounded-[2.5rem] overflow-hidden h-80 relative">
-            <div id="leafletMap" style="width:100%;height:100%"></div>
-        </div>
+        <section class="map-card glass-card p-5 rounded-[2.5rem] shadow-xl border border-white/5">
+            <div class="section-copy">
+                <p class="section-label">Nabolagskart</p>
+                <p class="section-title">Se hvor det faktisk rapporteres</p>
+            </div>
+            <div id="mapContainer" class="map-glow rounded-[2.5rem] overflow-hidden h-80 relative">
+                <div id="leafletMap" style="width:100%;height:100%"></div>
+            </div>
+        </section>
 
-        <div class="glass-card p-8 rounded-[2.5rem] shadow-xl border border-white/5">
+        <div class="report-card glass-card p-8 rounded-[2.5rem] shadow-xl border border-white/5">
+            <div class="section-copy section-copy--compact">
+                <p class="section-label">Rapporter</p>
+                <p class="section-title">Del det du ser akkurat na</p>
+            </div>
             <h3 class="text-[10px] font-black text-slate-500 uppercase mb-6 tracking-[0.2em] text-center italic">Ny observasjon</h3>
             <form id="reportForm" action="save.php" method="POST" onsubmit="handleSubmit(event)" class="space-y-4">
                 <label for="userInput" class="sr-only">Ditt navn</label>
@@ -403,7 +419,7 @@ try {
         </div>
 
         <?php if ($latestPatchnote): ?>
-        <section class="glass-card rounded-[2.5rem] border border-white/5 p-6 shadow-xl">
+        <section class="patchnotes-preview glass-card rounded-[2.5rem] border border-white/5 p-6 shadow-xl">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div class="max-w-2xl">
                     <div class="flex flex-wrap items-center gap-2">
@@ -430,7 +446,7 @@ try {
         </section>
         <?php endif; ?>
 
-        <div class="glass-card p-8 rounded-[2.5rem] shadow-xl border border-white/5">
+        <div class="feed-card glass-card p-8 rounded-[2.5rem] shadow-xl border border-white/5">
             <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
                 <h3 id="obsTitle" class="text-[10px] font-black text-sky-500 uppercase tracking-widest text-center italic">Siste observasjoner</h3>
                 <p id="feedStatusPill" data-tone="neutral" class="feed-status rounded-full border border-sky-400/20 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-sky-200">Live nå</p>
@@ -464,8 +480,9 @@ try {
             <button id="resetFilter" onclick="filterWeather('all')" class="hidden mt-6 text-center w-full text-[9px] uppercase font-bold text-slate-500 tracking-widest">Gå tilbake til oversikt</button>
         </div>
     </main>
+    </div>
 
-    <nav class="fixed bottom-0 left-0 right-0 bg-slate-950/90 backdrop-blur-2xl border-t border-white/10 px-6 py-6 z-[1200]" style="padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));">
+    <nav class="app-bottom-nav fixed bottom-0 left-0 right-0 bg-slate-950/90 backdrop-blur-2xl border-t border-white/10 px-6 py-6 z-[1200]" style="padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));">
         <div class="flex justify-around items-center max-w-md mx-auto">
             <button onclick="filterWeather('all')" id="nav-all" class="flex flex-col items-center text-sky-400">
                 <i data-lucide="layout-dashboard" class="w-6 h-6"></i>

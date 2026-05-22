@@ -1,4 +1,4 @@
-<section class="vv-section" aria-labelledby="rainTitle">
+<section class="vv-section vv-forecast-section" aria-labelledby="rainTitle">
     <div class="vv-section-heading">
         <h2 id="rainTitle"><i data-lucide="droplets" class="w-5 h-5"></i> Neste timer</h2>
         <p><?= htmlspecialchars($rainSummary) ?></p>
@@ -11,7 +11,7 @@
     <div class="vv-chart-axis"><span>Nå</span><span>+6t</span><span>+12t</span></div>
 </section>
 
-<section class="vv-section" aria-labelledby="hourlyTitle">
+<section class="vv-section vv-forecast-section" aria-labelledby="hourlyTitle">
     <div class="vv-section-heading">
         <h2 id="hourlyTitle"><i data-lucide="thermometer" class="w-5 h-5"></i> Temperatur i dag</h2>
         <p>Time-for-time</p>
@@ -26,7 +26,7 @@
     </div>
 </section>
 
-<section class="vv-section" aria-labelledby="dailyTitle">
+<section class="vv-section vv-forecast-section" aria-labelledby="dailyTitle">
     <div class="vv-section-heading">
         <h2 id="dailyTitle"><i data-lucide="calendar-days" class="w-5 h-5"></i> 5-dagers varsel</h2>
         <p>MET.no</p>

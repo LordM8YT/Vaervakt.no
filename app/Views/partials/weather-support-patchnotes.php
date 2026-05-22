@@ -1,4 +1,4 @@
-<section class="vv-section support-card <?= $supportReady ? '' : 'is-pending' ?>" aria-labelledby="supportTitle">
+<section class="vv-section vv-support-section support-card <?= $supportReady ? '' : 'is-pending' ?>" aria-labelledby="supportTitle">
     <div class="vv-two-column">
         <div>
             <p class="vv-eyebrow">Støtt Værvakt</p>
@@ -18,7 +18,7 @@
 </section>
 
 <?php if ($latestPatchnote): ?>
-<section class="vv-section" aria-labelledby="latestPatchTitle">
+<section class="vv-section vv-patchnotes-section" aria-labelledby="latestPatchTitle">
     <div class="vv-two-column">
         <div>
             <p class="vv-eyebrow">Nyeste patchnote · <?= htmlspecialchars(formatPatchnoteDateLabel($latestPatchnote['date'])) ?></p>

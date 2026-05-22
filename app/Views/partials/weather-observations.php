@@ -1,4 +1,4 @@
-<section class="vv-section" aria-labelledby="obsTitle">
+<section class="vv-section vv-observations-section" aria-labelledby="obsTitle">
     <div class="vv-section-heading">
         <h2 id="obsTitle"><i data-lucide="map-pin" class="w-5 h-5"></i> Lokale rapporter</h2>
         <p id="feedStatusPill" data-tone="neutral" class="feed-status">Live nå</p>

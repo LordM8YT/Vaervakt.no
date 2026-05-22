@@ -169,95 +169,6 @@ function formatRelativeTimeLabel($timestamp) {
     return $created->format('d.m H:i');
 }
 
-
-function buildHourlyForecastForUi($data, $limit = 9) {
-    $series = $data['properties']['timeseries'] ?? [];
-    $items = [];
-    foreach (array_slice($series, 0, $limit) as $i => $entry) {
-        $temp = $entry['data']['instant']['details']['air_temperature'] ?? null;
-        $time = $entry['time'] ?? '';
-        try {
-            $label = $i === 0 ? 'Nå' : (new DateTime($time))->format('H');
-        } catch (Exception $e) {
-            $label = $i === 0 ? 'Nå' : '+' . $i . 't';
-        }
-        $items[] = [
-            'label' => $label,
-            'temp' => is_numeric($temp) ? (string)round((float)$temp) : '--',
-        ];
-    }
-    return $items ?: [['label' => 'Nå', 'temp' => '--']];
-}
-
-function buildRainBarsForUi($data, $limit = 12) {
-    $series = $data['properties']['timeseries'] ?? [];
-    $amounts = [];
-    foreach (array_slice($series, 0, $limit) as $i => $entry) {
-        $amount = $entry['data']['next_1_hours']['details']['precipitation_amount']
-            ?? $entry['data']['next_6_hours']['details']['precipitation_amount']
-            ?? 0;
-        $amounts[] = max(0, (float)$amount);
-    }
-    if (!$amounts) {
-        $amounts = array_fill(0, $limit, 0);
-    }
-    $max = max($amounts) ?: 1;
-    $bars = [];
-    foreach ($amounts as $i => $amount) {
-        $bars[] = [
-            'height' => max(8, (int)round(($amount / $max) * 100)),
-            'amount' => number_format($amount, 1, ',', ''),
-            'label' => $i === 0 ? 'Nå' : '+' . $i . 't',
-        ];
-    }
-    return $bars;
-}
-
-function formatDayLabelForUi($date) {
-    $labels = ['SØN', 'MAN', 'TIR', 'ONS', 'TOR', 'FRE', 'LØR'];
-    if ($date instanceof DateTime) {
-        return $labels[(int)$date->format('w')] ?? strtoupper($date->format('D'));
-    }
-    return 'DAG';
-}
-
-function buildDailyForecastForUi($data, $limit = 5) {
-    $series = $data['properties']['timeseries'] ?? [];
-    $days = [];
-    foreach ($series as $entry) {
-        $time = $entry['time'] ?? '';
-        try {
-            $dt = new DateTime($time);
-        } catch (Exception $e) {
-            continue;
-        }
-        $key = $dt->format('Y-m-d');
-        if (!isset($days[$key])) {
-            $days[$key] = ['date' => $dt, 'temps' => [], 'rain' => 0.0];
-        }
-        $temp = $entry['data']['instant']['details']['air_temperature'] ?? null;
-        if (is_numeric($temp)) {
-            $days[$key]['temps'][] = (float)$temp;
-        }
-        $days[$key]['rain'] += (float)($entry['data']['next_1_hours']['details']['precipitation_amount'] ?? 0);
-    }
-    $out = [];
-    foreach (array_slice($days, 0, $limit, true) as $day) {
-        $temps = $day['temps'] ?: [0];
-        $low = (int)round(min($temps));
-        $high = (int)round(max($temps));
-        $range = min(100, max(18, ($high - $low + 2) * 12));
-        $out[] = [
-            'label' => formatDayLabelForUi($day['date']),
-            'low' => $low,
-            'high' => $high,
-            'rain' => number_format($day['rain'], 1, ',', ''),
-            'range' => $range,
-        ];
-    }
-    return $out ?: [['label' => 'I DAG', 'low' => 0, 'high' => 0, 'rain' => '0,0', 'range' => 20]];
-}
-
 function formatPatchnoteDateLabel($dateString) {
     if (!$dateString) {
         return '';
@@ -305,18 +216,6 @@ try {
     $api_error = true;
     error_log('MET.no API error: ' . $e->getMessage());
 }
-
-$hourlyForecast = isset($data) ? buildHourlyForecastForUi($data) : buildHourlyForecastForUi([]);
-$rainBars = isset($data) ? buildRainBarsForUi($data) : buildRainBarsForUi([]);
-$dailyForecast = isset($data) ? buildDailyForecastForUi($data) : buildDailyForecastForUi([]);
-$currentDetails = $data['properties']['timeseries'][0]['data']['instant']['details'] ?? [];
-$currentWind = isset($currentDetails['wind_speed']) ? round((float)$currentDetails['wind_speed'] * 3.6) : null;
-$currentHumidity = isset($currentDetails['relative_humidity']) ? round((float)$currentDetails['relative_humidity']) : null;
-$rainSoon = 0.0;
-foreach (array_slice($rainBars, 0, 4) as $bar) {
-    $rainSoon += (float)str_replace(',', '.', (string)$bar['amount']);
-}
-$rainSummary = $rainSoon > 0 ? 'Nedbør mulig snart' : 'Rolig akkurat nå';
 ?>
 <!DOCTYPE html>
 <html lang="no">
@@ -335,7 +234,7 @@ $rainSummary = $rainSoon > 0 ? 'Nedbør mulig snart' : 'Rolig akkurat nå';
     <link rel="stylesheet" href="assets/vendor/leaflet.markercluster/MarkerCluster.css">
     <link rel="stylesheet" href="assets/vendor/leaflet.markercluster/MarkerCluster.Default.css">
 </head>
-<body class="vv-body">
+<body class="flex flex-col">
 
     <div id="infoModal" class="modal p-6" onclick="closeModal('infoModal')" aria-hidden="true">
         <div class="glass-card p-10 rounded-[2.5rem] max-w-sm w-full text-center" onclick="event.stopPropagation()">
@@ -384,20 +283,203 @@ $rainSummary = $rainSoon > 0 ? 'Nedbør mulig snart' : 'Rolig akkurat nå';
     </div>
     <?php endif; ?>
 
-    <div class="vv-device-shell">
-        <div class="vv-dynamic-island" aria-hidden="true"></div>
-        <div class="vv-gradient-sky" aria-hidden="true"></div>
-        <main class="vv-app-scroll" id="top">
-            <?php include __DIR__ . '/app/Views/partials/weather-search-actions.php'; ?>
-            <?php include __DIR__ . '/app/Views/partials/weather-hero.php'; ?>
-            <?php include __DIR__ . '/app/Views/partials/weather-forecast.php'; ?>
-            <?php include __DIR__ . '/app/Views/partials/weather-map.php'; ?>
-            <?php include __DIR__ . '/app/Views/partials/weather-observations.php'; ?>
-            <?php include __DIR__ . '/app/Views/partials/weather-support-patchnotes.php'; ?>
-        </main>
-        <?php include __DIR__ . '/app/Views/partials/weather-report-sheet.php'; ?>
-        <?php include __DIR__ . '/app/Views/partials/weather-bottom-nav.php'; ?>
-    </div>
+    <header class="p-6 text-center flex flex-col items-center">
+        <h1 class="text-3xl font-black tracking-tighter text-sky-400 italic uppercase mb-4">VÆRVAKT.NO</h1>
+        <div class="w-full max-w-xl">
+            <div class="relative mb-4">
+                <input id="placeSearch" type="search" placeholder="Søk på sted eller koordinater" class="w-full p-3 rounded-2xl text-sm" aria-label="Søk sted">
+                <div id="searchResults" class="absolute left-0 right-0 mt-2 bg-white/5 backdrop-blur rounded-xl max-h-60 overflow-auto" style="display:none; z-index:1100;"></div>
+            </div>
+        </div>
+        <div class="glass-card bg-slate-900/40 border border-white/5 px-6 py-6 rounded-[1.5rem] w-full text-center">
+            <p id="pushStatus" class="text-slate-300 text-xs tracking-wide"><?= $pushReady ? 'Push-varsler: ikke abonnert' : 'Push-varsler: kommer snart' ?></p>
+            <div class="flex flex-wrap gap-3 justify-center mt-3">
+                <button id="pushBtn" <?= $pushReady ? '' : 'disabled' ?> class="<?= $pushReady ? 'bg-sky-500' : 'bg-slate-800 text-slate-400 cursor-not-allowed' ?> px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-widest"><?= $pushReady ? 'Aktiver varsler' : 'Varsler kommer snart' ?></button>
+                <button id="installBtn" class="hidden bg-slate-700 px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-widest">Installer app</button>
+                <?php if ($patchnotes): ?>
+                    <button type="button" onclick="openModal('patchnotesModal')" class="bg-slate-800 px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-widest">Patchnotes</button>
+                <?php endif; ?>
+                <button id="shareBtn" class="bg-slate-800 px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-widest">Del appen</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="px-4 max-w-4xl mx-auto space-y-6 flex-1 pb-40 w-full">
+        <div class="glass-card p-8 rounded-[2.5rem] flex items-center justify-around shadow-2xl">
+            <div id="weatherIcon" style="min-width: 80px; display: flex; align-items: center; justify-content: center;">
+                <?php if ($api_error): ?>
+                    <span class="spinner"></span>
+                <?php else: ?>
+                    <img src="https://raw.githubusercontent.com/metno/weathericons/main/weather/svg/<?= $symbol ?>.svg" class="w-20 h-20" alt="Værikon">
+                <?php endif; ?>
+            </div>
+            <div class="text-left">
+                <span class="text-7xl font-black italic" id="tempDisplay"><?= $temp_now ?>°</span>
+                <p class="text-sky-500 text-[10px] font-bold uppercase tracking-widest text-center">Lokal Status</p>
+            </div>
+        </div>
+
+        <div id="mapContainer" class="map-glow rounded-[2.5rem] overflow-hidden h-80 relative">
+            <div id="leafletMap" style="width:100%;height:100%"></div>
+        </div>
+
+        <div class="glass-card p-8 rounded-[2.5rem] shadow-xl border border-white/5">
+            <h3 class="text-[10px] font-black text-slate-500 uppercase mb-6 tracking-[0.2em] text-center italic">Ny observasjon</h3>
+            <form id="reportForm" action="save.php" method="POST" onsubmit="handleSubmit(event)" class="space-y-4">
+                <label for="userInput" class="sr-only">Ditt navn</label>
+                <input id="userInput" type="text" name="user" required placeholder="Ditt navn" class="w-full p-4 rounded-2xl text-sm" aria-label="Ditt navn" autocomplete="nickname" maxlength="50">
+                <div class="sr-only-trap" aria-hidden="true">
+                    <label for="companyWebsite">Nettside</label>
+                    <input id="companyWebsite" type="text" name="company_website" tabindex="-1" autocomplete="off">
+                </div>
+                <div class="relative">
+                    <select id="weatherInput" name="weather_type" required class="w-full p-4 rounded-2xl text-sm appearance-none cursor-pointer" aria-label="Værtype">
+                        <option value="">-- Velg værtype --</option>
+                        <option value="Sol">☀️ Sol / Klart</option>
+                        <option value="Skyet">☁️ Overskyet</option>
+                        <option value="Regn">🌧️ Regn / Byger</option>
+                        <option value="Snø">❄️ Snø / Sludd</option>
+                        <option value="Tåke">🌫️ Tåke</option>
+                        <option value="Vind">💨 Kraftig vind / Storm</option>
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+                        <i data-lucide="chevron-down" class="w-4 h-4"></i>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
+                    <label for="locInput" class="sr-only">Sted</label>
+                    <input id="locInput" type="text" name="loc" required placeholder="Sted eller nabolag" class="sm:col-span-3 p-4 rounded-2xl text-sm" aria-label="Sted" autocomplete="address-level2" maxlength="100">
+                    <label for="tempInput" class="sr-only">Temperatur</label>
+                    <input id="tempInput" type="number" step="0.1" name="temp" required placeholder="°C" class="sm:col-span-1 p-4 rounded-2xl text-sm text-center" aria-label="Temperatur" inputmode="decimal">
+                </div>
+                <div class="flex flex-col gap-3 rounded-[1.5rem] bg-slate-950/30 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="min-w-0">
+                        <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Auto-posisjon</p>
+                        <p id="locationAssistText" class="status-hint mt-1 text-sm text-slate-300">Trykk for å hente sted automatisk, også utenfor Norge.</p>
+                    </div>
+                    <button type="button" id="useLocationBtn" class="shrink-0 rounded-2xl bg-slate-800 px-4 py-3 text-xs font-black uppercase tracking-widest text-white">Bruk min posisjon</button>
+                </div>
+                <input type="hidden" name="form_started_at" value="">
+                <div class="flex items-center gap-2">
+                    <button type="button" id="addFavoriteBtn" class="px-4 py-2 bg-slate-800 rounded-2xl text-xs">Legg til favoritt</button>
+                    <select id="favoritesSelect" class="p-3 rounded-2xl text-sm text-slate-300 bg-slate-900/30">
+                        <option value="">Velg favoritt</option>
+                    </select>
+                </div>
+                <input type="hidden" name="lat" id="formLat" value="<?= htmlspecialchars($_GET['lat'] ?? '') ?>">
+                <input type="hidden" name="lon" id="formLon" value="<?= htmlspecialchars($_GET['lon'] ?? '') ?>">
+                <button id="submitBtn" type="submit" class="w-full bg-sky-500 hover:bg-sky-400 py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2">
+                    <span id="submitText">Send værrapport</span>
+                </button>
+            </form>
+        </div>
+
+        <div class="glass-card support-card <?= $supportReady ? '' : 'is-pending' ?> p-6 rounded-[2.5rem] shadow-xl border border-white/5">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div class="max-w-xl">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <p class="text-[10px] font-black uppercase tracking-[0.2em] text-sky-400">Støtt Værvakt</p>
+                        <span class="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-300">
+                            <?= $supportReady ? 'Vipps klar' : 'Vipps på vei' ?>
+                        </span>
+                    </div>
+                    <p class="mt-2 text-sm leading-relaxed text-slate-300">
+                        <?= $supportReady
+                            ? 'Bidrag hjelper oss med drift, push-varsler og bedre lokal værdekning uten å fylle appen med reklame.'
+                            : 'Vipps-lenken er snart klar. Når den er godkjent dukker støtteknappen opp her med én gang.' ?>
+                    </p>
+                </div>
+                <?php if ($supportReady): ?>
+                    <a href="<?= htmlspecialchars($supportUrl) ?>" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center rounded-2xl bg-sky-500 px-5 py-3 text-xs font-black uppercase tracking-widest text-slate-950">
+                        <?= htmlspecialchars($supportLabel) ?>
+                    </a>
+                <?php else: ?>
+                    <button type="button" disabled class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-slate-900/60 px-5 py-3 text-xs font-black uppercase tracking-widest text-slate-400 cursor-not-allowed">
+                        Vipps kommer snart
+                    </button>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <?php if ($latestPatchnote): ?>
+        <section class="glass-card rounded-[2.5rem] border border-white/5 p-6 shadow-xl">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div class="max-w-2xl">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <p class="text-[10px] font-black uppercase tracking-[0.2em] text-sky-400">Nyeste patchnote</p>
+                        <span class="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-300"><?= htmlspecialchars(formatPatchnoteDateLabel($latestPatchnote['date'])) ?></span>
+                        <?php if (!empty($latestPatchnote['tag'])): ?>
+                            <span class="rounded-full border border-sky-400/20 bg-sky-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-sky-200"><?= htmlspecialchars($latestPatchnote['tag']) ?></span>
+                        <?php endif; ?>
+                    </div>
+                    <h3 class="mt-3 text-xl font-black text-white sm:text-2xl"><?= htmlspecialchars($latestPatchnote['title']) ?></h3>
+                    <?php if (!empty($latestPatchnote['summary'])): ?>
+                        <p class="mt-2 text-sm leading-relaxed text-slate-300"><?= htmlspecialchars($latestPatchnote['summary']) ?></p>
+                    <?php endif; ?>
+                </div>
+                <button type="button" onclick="openModal('patchnotesModal')" class="inline-flex items-center justify-center rounded-2xl bg-slate-900/70 px-5 py-3 text-xs font-black uppercase tracking-widest text-white">Se alle patchnotes</button>
+            </div>
+            <?php if (!empty($latestPatchnote['items'])): ?>
+                <div class="mt-4 grid gap-3">
+                    <?php foreach (array_slice($latestPatchnote['items'], 0, 3) as $item): ?>
+                        <div class="patchnote-accent rounded-[1.5rem] border border-white/6 px-4 py-3 text-sm leading-relaxed text-slate-200"><?= htmlspecialchars($item) ?></div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </section>
+        <?php endif; ?>
+
+        <div class="glass-card p-8 rounded-[2.5rem] shadow-xl border border-white/5">
+            <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+                <h3 id="obsTitle" class="text-[10px] font-black text-sky-500 uppercase tracking-widest text-center italic">Siste observasjoner</h3>
+                <p id="feedStatusPill" data-tone="neutral" class="feed-status rounded-full border border-sky-400/20 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-sky-200">Live nå</p>
+            </div>
+            <div id="observationList" class="space-y-4">
+                <?php
+                if (!$latestReports) {
+                    echo '<p id="noObservationsMsg" class="text-xs text-slate-500 italic py-4 text-center">Ingen observasjoner enda...</p>';
+                } else {
+                    foreach ($latestReports as $row) {
+                        $type = $row['weather_condition'] ?? '';
+                        $emoji = weatherEmoji($type);
+                        $timeLabel = formatRelativeTimeLabel($row['created_at'] ?? null);
+
+                        echo '<div class="obs-item flex items-center justify-between gap-4 bg-slate-950/30 p-4 rounded-2xl border border-white/5" data-type="' . htmlspecialchars($type) . '">';
+                        echo '  <div class="flex min-w-0 items-center gap-4 text-left">';
+                        echo '    <div class="text-3xl leading-none" aria-hidden="true">' . $emoji . '</div>';
+                        echo '    <div class="min-w-0">';
+                        echo '      <p class="text-[10px] uppercase font-black tracking-[0.16em] text-slate-500">' . htmlspecialchars($timeLabel) . '</p>';
+                        echo '      <p class="truncate text-sm font-bold">' . htmlspecialchars($row['username']) . ' i ' . htmlspecialchars($row['location']) . '</p>';
+                        echo '      <p class="text-[10px] uppercase font-black text-sky-400">' . htmlspecialchars($type) . '</p>';
+                        echo '    </div>';
+                        echo '  </div>';
+                        echo '  <div class="shrink-0 text-right font-black italic text-xl">' . round((float)$row['temperature']) . '°</div>';
+                        echo '</div>';
+                    }
+                }
+                ?>
+                <p id="emptyFilterMsg" class="text-xs text-slate-500 italic py-4 text-center" style="display: none;">Ingen kritiske forhold rapportert akkurat nå...</p>
+            </div>
+            <button id="resetFilter" onclick="filterWeather('all')" class="hidden mt-6 text-center w-full text-[9px] uppercase font-bold text-slate-500 tracking-widest">Gå tilbake til oversikt</button>
+        </div>
+    </main>
+
+    <nav class="fixed bottom-0 left-0 right-0 bg-slate-950/90 backdrop-blur-2xl border-t border-white/10 px-6 py-6 z-[1200]" style="padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));">
+        <div class="flex justify-around items-center max-w-md mx-auto">
+            <button onclick="filterWeather('all')" id="nav-all" class="flex flex-col items-center text-sky-400">
+                <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
+                <span class="text-[9px] mt-1.5 font-black uppercase">Oversikt</span>
+            </button>
+            <button onclick="filterWeather('vann')" id="nav-vann" class="flex flex-col items-center text-slate-500 transition-colors">
+                <i data-lucide="waves" class="w-6 h-6"></i>
+                <span class="text-[9px] mt-1.5 font-black uppercase">Flom/Snø</span>
+            </button>
+            <button onclick="openModal('infoModal')" class="flex flex-col items-center text-slate-500">
+                <i data-lucide="shield-check" class="w-6 h-6"></i>
+                <span class="text-[9px] mt-1.5 font-black uppercase">Info</span>
+            </button>
+        </div>
+    </nav>
     <script src="assets/vendor/lucide/lucide.min.js"></script>
     <script src="assets/vendor/leaflet/leaflet.js"></script>
     <script src="assets/vendor/leaflet.markercluster/leaflet.markercluster.js"></script>

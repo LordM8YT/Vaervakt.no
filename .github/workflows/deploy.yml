@@ -28,7 +28,7 @@ jobs:
         env:
           WEBHUSET_HOST: linweb22.hmg9.webhuset.no
           WEBHUSET_KNOWN_HOSTS: ${{ secrets.WEBHUSET_KNOWN_HOSTS }}
-          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD }}
+          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD || vars.WEBHUSET_PASSWORD }}
           WEBHUSET_PORT: 22
           WEBHUSET_SSH_KEY: ${{ secrets.WEBHUSET_SSH_KEY }}
           WEBHUSET_USERNAME: xnvrvaktpuano
@@ -59,7 +59,7 @@ jobs:
       - name: Ensure remote path exists
         env:
           WEBHUSET_HOST: linweb22.hmg9.webhuset.no
-          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD }}
+          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD || vars.WEBHUSET_PASSWORD }}
           WEBHUSET_PORT: 22
           WEBHUSET_REMOTE_PATH: /home/X/xnvrvaktpuano/www
           WEBHUSET_SSH_KEY: ${{ secrets.WEBHUSET_SSH_KEY }}
@@ -82,7 +82,7 @@ jobs:
       - name: Locate existing production .env
         env:
           WEBHUSET_HOST: linweb22.hmg9.webhuset.no
-          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD }}
+          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD || vars.WEBHUSET_PASSWORD }}
           WEBHUSET_PORT: 22
           WEBHUSET_REMOTE_PATH: /home/X/xnvrvaktpuano/www
           WEBHUSET_SSH_KEY: ${{ secrets.WEBHUSET_SSH_KEY }}
@@ -107,32 +107,32 @@ jobs:
 
       - name: Provision production .env from secrets
         env:
-          DATABASE_HOST: ${{ secrets.DATABASE_HOST }}
-          DATABASE_NAME: ${{ secrets.DATABASE_NAME }}
-          DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
-          DATABASE_PORT: ${{ secrets.DATABASE_PORT }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DATABASE_USER: ${{ secrets.DATABASE_USER }}
-          DB_HOST: ${{ secrets.DB_HOST }}
-          DB_NAME: ${{ secrets.DB_NAME }}
-          DB_PASS: ${{ secrets.DB_PASS }}
-          DB_PORT: ${{ secrets.DB_PORT }}
-          DB_USER: ${{ secrets.DB_USER }}
-          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
-          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
-          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
-          MYSQL_PORT: ${{ secrets.MYSQL_PORT }}
-          MYSQL_USER: ${{ secrets.MYSQL_USER }}
-          SUPPORT_LABEL: ${{ secrets.SUPPORT_LABEL }}
-          SUPPORT_URL: ${{ secrets.SUPPORT_URL }}
-          VAERVAKT_DEBUG: ${{ secrets.VAERVAKT_DEBUG }}
-          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
-          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
-          VAPID_PUBLIC: ${{ secrets.VAPID_PUBLIC }}
-          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
-          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+          DATABASE_HOST: ${{ secrets.DATABASE_HOST || vars.DATABASE_HOST }}
+          DATABASE_NAME: ${{ secrets.DATABASE_NAME || vars.DATABASE_NAME }}
+          DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD || vars.DATABASE_PASSWORD }}
+          DATABASE_PORT: ${{ secrets.DATABASE_PORT || vars.DATABASE_PORT }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL || vars.DATABASE_URL }}
+          DATABASE_USER: ${{ secrets.DATABASE_USER || vars.DATABASE_USER }}
+          DB_HOST: ${{ secrets.DB_HOST || vars.DB_HOST }}
+          DB_NAME: ${{ secrets.DB_NAME || vars.DB_NAME }}
+          DB_PASS: ${{ secrets.DB_PASS || vars.DB_PASS }}
+          DB_PORT: ${{ secrets.DB_PORT || vars.DB_PORT }}
+          DB_USER: ${{ secrets.DB_USER || vars.DB_USER }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE || vars.MYSQL_DATABASE }}
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST || vars.MYSQL_HOST }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD || vars.MYSQL_PASSWORD }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT || vars.MYSQL_PORT }}
+          MYSQL_USER: ${{ secrets.MYSQL_USER || vars.MYSQL_USER }}
+          SUPPORT_LABEL: ${{ secrets.SUPPORT_LABEL || vars.SUPPORT_LABEL }}
+          SUPPORT_URL: ${{ secrets.SUPPORT_URL || vars.SUPPORT_URL }}
+          VAERVAKT_DEBUG: ${{ secrets.VAERVAKT_DEBUG || vars.VAERVAKT_DEBUG }}
+          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE || vars.VAPID_PRIVATE }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY || vars.VAPID_PRIVATE_KEY }}
+          VAPID_PUBLIC: ${{ secrets.VAPID_PUBLIC || vars.VAPID_PUBLIC }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY || vars.VAPID_PUBLIC_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT || vars.VAPID_SUBJECT }}
           WEBHUSET_HOST: linweb22.hmg9.webhuset.no
-          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD }}
+          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD || vars.WEBHUSET_PASSWORD }}
           WEBHUSET_PORT: 22
           WEBHUSET_REMOTE_PATH: /home/X/xnvrvaktpuano/www
           WEBHUSET_SSH_KEY: ${{ secrets.WEBHUSET_SSH_KEY }}
@@ -216,7 +216,7 @@ jobs:
         timeout-minutes: 5
         env:
           WEBHUSET_HOST: linweb22.hmg9.webhuset.no
-          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD }}
+          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD || vars.WEBHUSET_PASSWORD }}
           WEBHUSET_PORT: 22
           WEBHUSET_REMOTE_PATH: /home/X/xnvrvaktpuano/www
           WEBHUSET_SSH_KEY: ${{ secrets.WEBHUSET_SSH_KEY }}

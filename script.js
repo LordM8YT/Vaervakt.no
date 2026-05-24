@@ -7,6 +7,30 @@ const pushConfig = {
 };
 
 let pushRegistrationPromise = null;
+let pushConfigPromise = null;
+
+async function loadPushConfig() {
+  if (pushConfigPromise) {
+    return pushConfigPromise;
+  }
+
+  pushConfigPromise = fetch('api/config.php', {
+    headers: { Accept: 'application/json' },
+    cache: 'no-store',
+  }).then(async (response) => {
+    if (!response.ok) return pushConfig;
+    const payload = await response.json();
+    if (payload.vapidPublicKey) {
+      pushConfig.vapidPublicKey = payload.vapidPublicKey;
+    }
+    if (payload.subscriptionEndpoint) {
+      pushConfig.subscriptionEndpoint = payload.subscriptionEndpoint;
+    }
+    return pushConfig;
+  }).catch(() => pushConfig);
+
+  return pushConfigPromise;
+}
 
 function urlBase64ToUint8Array(base64String) {
   const normalized = String(base64String || '').trim().replace(/\s/g, '');
@@ -62,6 +86,8 @@ async function subscribeToPush() {
   }
 
   pushRegistrationPromise = (async () => {
+    await loadPushConfig();
+
     if (!('PushManager' in window)) {
       notify('Push-varsler støttes ikke i denne nettleseren.');
       return null;
@@ -130,6 +156,7 @@ function addPushButton() {
 
 document.addEventListener('DOMContentLoaded', () => {
   registerServiceWorker();
+  loadPushConfig();
   addPushButton();
 });
 

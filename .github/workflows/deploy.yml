@@ -1,0 +1,130 @@
+name: Deploy static PWA to Webhuset
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: webhuset-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Sync static files
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install rsync dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rsync sshpass
+
+      - name: Prepare SSH
+        env:
+          WEBHUSET_HOST: linweb22.hmg9.webhuset.no
+          WEBHUSET_KNOWN_HOSTS: ${{ secrets.WEBHUSET_KNOWN_HOSTS }}
+          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD }}
+          WEBHUSET_PORT: 22
+          WEBHUSET_SSH_KEY: ${{ secrets.WEBHUSET_SSH_KEY }}
+          WEBHUSET_USERNAME: xnvrvaktpuano
+        run: |
+          set -eu
+          : "${WEBHUSET_HOST:?Missing WEBHUSET_HOST}"
+          : "${WEBHUSET_USERNAME:?Missing WEBHUSET_USERNAME}"
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          if [ -n "${WEBHUSET_SSH_KEY:-}" ]; then
+            printf '%s\n' "$WEBHUSET_SSH_KEY" > ~/.ssh/id_ed25519
+            chmod 600 ~/.ssh/id_ed25519
+          elif [ -z "${WEBHUSET_PASSWORD:-}" ]; then
+            echo "Missing WEBHUSET_SSH_KEY or WEBHUSET_PASSWORD secret"
+            exit 1
+          fi
+
+          if [ -n "${WEBHUSET_KNOWN_HOSTS:-}" ]; then
+            printf '%s\n' "$WEBHUSET_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -p "${WEBHUSET_PORT:-22}" -H "$WEBHUSET_HOST" >> ~/.ssh/known_hosts
+          fi
+
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Ensure remote path exists
+        env:
+          WEBHUSET_HOST: linweb22.hmg9.webhuset.no
+          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD }}
+          WEBHUSET_PORT: 22
+          WEBHUSET_REMOTE_PATH: /home/X/xnvrvaktpuano/www
+          WEBHUSET_SSH_KEY: ${{ secrets.WEBHUSET_SSH_KEY }}
+          WEBHUSET_USERNAME: xnvrvaktpuano
+        run: |
+          set -eu
+          : "${WEBHUSET_REMOTE_PATH:?Missing WEBHUSET_REMOTE_PATH}"
+
+          if [ -z "${WEBHUSET_SSH_KEY:-}" ] && [ -n "${WEBHUSET_PASSWORD:-}" ]; then
+            sshpass -p "${WEBHUSET_PASSWORD}" \
+              ssh -p "${WEBHUSET_PORT:-22}" \
+              "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}" \
+              "mkdir -p '${WEBHUSET_REMOTE_PATH}'"
+          else
+            ssh -p "${WEBHUSET_PORT:-22}" \
+              "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}" \
+              "mkdir -p '${WEBHUSET_REMOTE_PATH}'"
+          fi
+
+      - name: Sync PWA to Webhuset
+        env:
+          WEBHUSET_HOST: linweb22.hmg9.webhuset.no
+          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD }}
+          WEBHUSET_PORT: 22
+          WEBHUSET_REMOTE_PATH: /home/X/xnvrvaktpuano/www
+          WEBHUSET_SSH_KEY: ${{ secrets.WEBHUSET_SSH_KEY }}
+          WEBHUSET_USERNAME: xnvrvaktpuano
+        run: |
+          set -eu
+
+          if [ -z "${WEBHUSET_SSH_KEY:-}" ] && [ -n "${WEBHUSET_PASSWORD:-}" ]; then
+            sshpass -p "${WEBHUSET_PASSWORD}" \
+              rsync \
+              --recursive \
+              --links \
+              --compress \
+              --delete \
+              --human-readable \
+              --itemize-changes \
+              --omit-dir-times \
+              --no-times \
+              --no-perms \
+              --no-owner \
+              --no-group \
+              --filter='P /statistikk/' \
+              --exclude-from=".github/rsync-exclude.txt" \
+              -e "ssh -p ${WEBHUSET_PORT:-22}" \
+              ./ \
+              "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}:${WEBHUSET_REMOTE_PATH}"
+          else
+            rsync \
+              --recursive \
+              --links \
+              --compress \
+              --delete \
+              --human-readable \
+              --itemize-changes \
+              --omit-dir-times \
+              --no-times \
+              --no-perms \
+              --no-owner \
+              --no-group \
+              --filter='P /statistikk/' \
+              --exclude-from=".github/rsync-exclude.txt" \
+              -e "ssh -p ${WEBHUSET_PORT:-22}" \
+              ./ \
+              "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}:${WEBHUSET_REMOTE_PATH}"
+          fi

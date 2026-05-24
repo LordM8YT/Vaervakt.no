@@ -156,19 +156,38 @@ try {
         ];
     }
 
-    $daily = [];
+    $dailyBuckets = [];
     foreach ($timeseries as $point) {
         $date = (new DateTime((string) $point['time']))->setTimezone(new DateTimeZone('Europe/Oslo'));
-        if ($date->format('H') !== '12') continue;
         $key = $date->format('Y-m-d');
-        if (isset($daily[$key])) continue;
         $details = vv_details($point);
-        $daily[$key] = [
-            'day' => vv_day_label($date, count($daily)),
-            'icon' => vv_weather_icon(vv_symbol($point)),
-            'temp' => round((float) ($details['air_temperature'] ?? 0)),
+        $temp = (float) ($details['air_temperature'] ?? 0);
+        if (!isset($dailyBuckets[$key])) {
+            $dailyBuckets[$key] = [
+                'date' => clone $date,
+                'temp' => $temp,
+                'symbol' => vv_symbol($point),
+            ];
+            continue;
+        }
+
+        if ($temp > $dailyBuckets[$key]['temp']) {
+            $dailyBuckets[$key]['temp'] = $temp;
+        }
+
+        $hour = (int) $date->format('H');
+        if ($hour >= 10 && $hour <= 14) {
+            $dailyBuckets[$key]['symbol'] = vv_symbol($point);
+        }
+    }
+
+    $daily = [];
+    foreach (array_slice($dailyBuckets, 0, 5) as $bucket) {
+        $daily[] = [
+            'day' => vv_day_label($bucket['date'], count($daily)),
+            'icon' => vv_weather_icon((string) $bucket['symbol']),
+            'temp' => round((float) $bucket['temp']),
         ];
-        if (count($daily) >= 5) break;
     }
 
     echo json_encode([
@@ -191,7 +210,7 @@ try {
         ],
         'rain' => $rain,
         'temperature' => $temperature,
-        'forecast' => array_values($daily),
+        'forecast' => $daily,
         'updatedAt' => $now['time'] ?? null,
     ], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $error) {

@@ -1,4 +1,11 @@
 const weatherState = {
+  location: {
+    id: 'kristiansand-no',
+    name: 'Kristiansand, NO',
+    lat: 58.1504,
+    lon: 7.9470,
+  },
+  uvIndex: 3,
   rain: [
     { hour: '16:00', amount: 0, probability: 0 },
     { hour: '17:00', amount: 0, probability: 0 },
@@ -38,6 +45,8 @@ const navItems = [
   { id: 'favorites', label: 'Favoritter', active: false, icon: '<path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88Z"></path>' },
   { id: 'alerts', label: 'Varsler', active: false, icon: '<path d="M18 8a6 6 0 1 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path>' },
 ];
+
+const favoritesStorageKey = 'vaervakt_favorites';
 
 function updateClock() {
   const clock = document.querySelector('#clock');
@@ -154,6 +163,32 @@ function renderForecast() {
     `;
     return row;
   }));
+}
+
+function renderWeatherMeta() {
+  const uvIndex = document.querySelector('#uv-index');
+  const uvStatus = document.querySelector('#uv-status');
+  const favoriteButton = document.querySelector('#favorite-location-button');
+
+  if (uvIndex) uvIndex.textContent = String(weatherState.uvIndex);
+  if (uvStatus) uvStatus.textContent = getUvStatus(weatherState.uvIndex);
+
+  if (favoriteButton) {
+    const note = favoriteButton.querySelector('.weather-meta-note');
+    const value = favoriteButton.querySelector('.weather-meta-value');
+    const isSaved = getFavorites().some((favorite) => favorite.id === weatherState.location.id);
+    favoriteButton.dataset.saved = String(isSaved);
+    favoriteButton.setAttribute('aria-pressed', String(isSaved));
+    if (value) value.textContent = isSaved ? 'Lagret' : 'Lagre';
+    if (note) note.textContent = weatherState.location.name;
+  }
+}
+
+function getUvStatus(index) {
+  if (index < 3) return 'Lav';
+  if (index < 6) return 'Moderat';
+  if (index < 8) return 'Høy';
+  return 'Svært høy';
 }
 
 function renderObservations() {
@@ -330,21 +365,84 @@ function renderFavorites() {
   const list = document.querySelector('#favorites-list');
   if (!list) return;
 
-  const favorites = JSON.parse(localStorage.getItem('vaervakt_favorites') || '[]');
+  const favorites = getFavorites();
   if (!favorites.length) {
     const empty = document.createElement('p');
     empty.className = 'empty-state';
-    empty.textContent = 'Ingen favoritter lagret ennå.';
+    empty.textContent = 'Ingen favoritter lagret ennå. Trykk Lagre på hjemskjermen for å legge til stedet.';
     list.replaceChildren(empty);
     return;
   }
 
   list.replaceChildren(...favorites.map((favorite) => {
-    const item = document.createElement('div');
-    item.className = 'empty-state';
-    item.textContent = favorite.name || favorite.location || 'Lagret sted';
+    const item = document.createElement('article');
+    item.className = 'favorite-item';
+    item.innerHTML = `
+      <div>
+        <p class="favorite-title">${escapeHtml(favorite.name || favorite.location || 'Lagret sted')}</p>
+        <p class="favorite-meta">${escapeHtml(favorite.label || 'Lokalt værsted')}</p>
+      </div>
+      <button class="favorite-remove" type="button" data-remove-favorite="${escapeHtml(favorite.id)}">Fjern</button>
+    `;
     return item;
   }));
+}
+
+function getFavorites() {
+  try {
+    const favorites = JSON.parse(localStorage.getItem(favoritesStorageKey) || '[]');
+    return Array.isArray(favorites) ? favorites : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveFavorites(favorites) {
+  localStorage.setItem(favoritesStorageKey, JSON.stringify(favorites));
+  renderWeatherMeta();
+  renderFavorites();
+}
+
+function toggleCurrentLocationFavorite() {
+  const favorites = getFavorites();
+  const index = favorites.findIndex((favorite) => favorite.id === weatherState.location.id);
+
+  if (index >= 0) {
+    favorites.splice(index, 1);
+    saveFavorites(favorites);
+    showToast('Favoritt fjernet.');
+    return;
+  }
+
+  favorites.unshift({
+    ...weatherState.location,
+    label: 'Aktivt sted',
+    savedAt: new Date().toISOString(),
+  });
+  saveFavorites(favorites);
+  showToast('Favoritt lagret.');
+}
+
+function bindFavorites() {
+  const favoriteButton = document.querySelector('#favorite-location-button');
+  if (favoriteButton) {
+    favoriteButton.addEventListener('click', toggleCurrentLocationFavorite);
+  }
+
+  const favoritesList = document.querySelector('#favorites-list');
+  if (favoritesList) {
+    favoritesList.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      const button = target.closest('[data-remove-favorite]');
+      if (!button) return;
+
+      const id = button.dataset.removeFavorite;
+      saveFavorites(getFavorites().filter((favorite) => favorite.id !== id));
+      showToast('Favoritt fjernet.');
+    });
+  }
 }
 
 function bindReportForm() {
@@ -421,9 +519,11 @@ function initApp() {
   drawRainChart();
   drawTemperatureChart();
   renderForecast();
+  renderWeatherMeta();
   renderObservations();
   renderNavigation();
   bindReportForm();
+  bindFavorites();
   renderFavorites();
   loadReports();
   window.setInterval(updateClock, 30_000);

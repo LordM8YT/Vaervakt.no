@@ -288,21 +288,15 @@ html {
   background: linear-gradient(90deg, #4a9eff, #f97316);
 }
 
-.forecast-fill--65 {
-  width: 65%;
-}
-
-.forecast-fill--72-5 {
-  width: 72.5%;
-}
-
-.forecast-fill--75 {
-  width: 75%;
-}
-
-.forecast-fill--77-5 {
-  width: 77.5%;
-}
+.forecast-fill--50 { width: 50%; }
+.forecast-fill--55 { width: 55%; }
+.forecast-fill--60 { width: 60%; }
+.forecast-fill--65 { width: 65%; }
+.forecast-fill--70 { width: 70%; }
+.forecast-fill--75 { width: 75%; }
+.forecast-fill--80 { width: 80%; }
+.forecast-fill--85 { width: 85%; }
+.forecast-fill--90 { width: 90%; }
 
 .glass-card {
   position: relative;

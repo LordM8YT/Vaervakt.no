@@ -5,7 +5,12 @@ const weatherState = {
     lat: 58.1504,
     lon: 7.9470,
   },
-  uvIndex: 3,
+  current: {
+    temperature: 21,
+    feelsLike: 21,
+    condition: 'Henter MET-data',
+  },
+  uvIndex: null,
   rain: [
     { hour: '16:00', amount: 0, probability: 0 },
     { hour: '17:00', amount: 0, probability: 0 },
@@ -69,6 +74,7 @@ function drawRainChart() {
   if (!svg) return;
 
   svg.replaceChildren();
+  if (weatherState.rain.length < 2) return;
   const width = 500;
   const top = 4;
   const bottom = 114;
@@ -115,6 +121,7 @@ function drawTemperatureChart() {
 
   svg.replaceChildren();
   const temps = weatherState.temperature;
+  if (temps.length < 2) return;
   const width = 492;
   const top = 18;
   const bottom = 90;
@@ -149,7 +156,11 @@ function renderForecast() {
   const list = document.querySelector('#forecast-list');
   if (!list) return;
 
+  const temps = weatherState.forecast.map((item) => Number(item.temp) || 0);
+  const min = Math.min(...temps);
+  const max = Math.max(...temps);
   list.replaceChildren(...weatherState.forecast.map((item) => {
+    const span = max === min ? 50 : ((Number(item.temp) - min) / (max - min)) * 35 + 55;
     const row = document.createElement('div');
     row.className = 'forecast-row';
     row.innerHTML = `
@@ -158,11 +169,28 @@ function renderForecast() {
       <span class="flex-1"></span>
       <span class="forecast-temp">${item.temp}°</span>
       <span class="forecast-track" aria-hidden="true">
-        <span class="forecast-fill forecast-fill--${String(item.width).replace('.', '-')}"></span>
+        <span class="forecast-fill forecast-fill--${getForecastWidthClass(span)}"></span>
       </span>
     `;
     return row;
   }));
+}
+
+function getForecastWidthClass(width) {
+  const rounded = Math.max(50, Math.min(90, Math.round(width / 5) * 5));
+  return String(rounded);
+}
+
+function renderCurrentWeather() {
+  const title = document.querySelector('#current-weather-title');
+  const temperature = document.querySelector('#temperature');
+  const feelsLike = document.querySelector('#feels-like');
+  const condition = document.querySelector('#weather-condition');
+
+  if (title) title.textContent = weatherState.location.name;
+  if (temperature) temperature.textContent = String(Math.round(Number(weatherState.current?.temperature ?? 0)));
+  if (feelsLike) feelsLike.textContent = `${Math.round(Number(weatherState.current?.feelsLike ?? weatherState.current?.temperature ?? 0))}°C`;
+  if (condition) condition.textContent = weatherState.current?.condition || '';
 }
 
 function renderWeatherMeta() {
@@ -170,8 +198,8 @@ function renderWeatherMeta() {
   const uvStatus = document.querySelector('#uv-status');
   const favoriteButton = document.querySelector('#favorite-location-button');
 
-  if (uvIndex) uvIndex.textContent = String(weatherState.uvIndex);
-  if (uvStatus) uvStatus.textContent = getUvStatus(weatherState.uvIndex);
+  if (uvIndex) uvIndex.textContent = weatherState.uvIndex === null ? '--' : String(weatherState.uvIndex);
+  if (uvStatus) uvStatus.textContent = weatherState.uvIndex === null ? 'Henter MET' : getUvStatus(weatherState.uvIndex);
 
   if (favoriteButton) {
     const note = favoriteButton.querySelector('.weather-meta-note');
@@ -182,6 +210,35 @@ function renderWeatherMeta() {
     if (value) value.textContent = isSaved ? 'Lagret' : 'Lagre';
     if (note) note.textContent = weatherState.location.name;
   }
+}
+
+async function loadWeather() {
+  try {
+    const response = await fetch(`api/weather.php?lat=${encodeURIComponent(weatherState.location.lat)}&lon=${encodeURIComponent(weatherState.location.lon)}`, {
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.message || 'Kunne ikke hente værdata fra MET');
+    }
+
+    weatherState.location = payload.location || weatherState.location;
+    weatherState.current = payload.current || weatherState.current;
+    weatherState.uvIndex = Number(payload.current?.uvIndex ?? 0);
+    weatherState.rain = Array.isArray(payload.rain) ? payload.rain : weatherState.rain;
+    weatherState.temperature = Array.isArray(payload.temperature) ? payload.temperature : weatherState.temperature;
+    weatherState.forecast = Array.isArray(payload.forecast) && payload.forecast.length ? payload.forecast : weatherState.forecast;
+  } catch (error) {
+    console.warn('Kunne ikke hente MET-værdata:', error);
+    showToast('Kunne ikke hente værdata fra MET akkurat nå.');
+  }
+
+  renderCurrentWeather();
+  renderWeatherMeta();
+  drawRainChart();
+  drawTemperatureChart();
+  renderForecast();
 }
 
 function getUvStatus(index) {
@@ -516,6 +573,7 @@ function showToast(message, timeout = 3200) {
 
 function initApp() {
   updateClock();
+  renderCurrentWeather();
   drawRainChart();
   drawTemperatureChart();
   renderForecast();
@@ -525,6 +583,7 @@ function initApp() {
   bindReportForm();
   bindFavorites();
   renderFavorites();
+  loadWeather();
   loadReports();
   window.setInterval(updateClock, 30_000);
 }

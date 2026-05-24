@@ -80,6 +80,7 @@ jobs:
           fi
 
       - name: Sync PWA to Webhuset
+        timeout-minutes: 5
         env:
           WEBHUSET_HOST: linweb22.hmg9.webhuset.no
           WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD }}
@@ -96,6 +97,8 @@ jobs:
               --recursive \
               --links \
               --compress \
+              --timeout=60 \
+              --contimeout=30 \
               --delete \
               --human-readable \
               --itemize-changes \
@@ -106,7 +109,7 @@ jobs:
               --no-group \
               --filter='P /statistikk/' \
               --exclude-from=".github/rsync-exclude.txt" \
-              -e "ssh -p ${WEBHUSET_PORT:-22}" \
+              -e "ssh -o ConnectTimeout=20 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -p ${WEBHUSET_PORT:-22}" \
               ./ \
               "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}:${WEBHUSET_REMOTE_PATH}"
           else
@@ -114,6 +117,8 @@ jobs:
               --recursive \
               --links \
               --compress \
+              --timeout=60 \
+              --contimeout=30 \
               --delete \
               --human-readable \
               --itemize-changes \
@@ -124,7 +129,7 @@ jobs:
               --no-group \
               --filter='P /statistikk/' \
               --exclude-from=".github/rsync-exclude.txt" \
-              -e "ssh -p ${WEBHUSET_PORT:-22}" \
+              -e "ssh -o ConnectTimeout=20 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -p ${WEBHUSET_PORT:-22}" \
               ./ \
               "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}:${WEBHUSET_REMOTE_PATH}"
           fi

@@ -114,6 +114,33 @@ jobs:
         run: |
           set -eu
 
+          upload_env_file() {
+            src="$1"
+            if [ -z "${WEBHUSET_SSH_KEY:-}" ] && [ -n "${WEBHUSET_PASSWORD:-}" ]; then
+              sshpass -p "${WEBHUSET_PASSWORD}" \
+                scp -P "${WEBHUSET_PORT:-22}" \
+                "$src" \
+                "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}:${WEBHUSET_REMOTE_PATH}/.env"
+              sshpass -p "${WEBHUSET_PASSWORD}" \
+                ssh -p "${WEBHUSET_PORT:-22}" \
+                "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}" \
+                "chmod 600 '${WEBHUSET_REMOTE_PATH}/.env'"
+            else
+              scp -P "${WEBHUSET_PORT:-22}" \
+                "$src" \
+                "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}:${WEBHUSET_REMOTE_PATH}/.env"
+              ssh -p "${WEBHUSET_PORT:-22}" \
+                "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}" \
+                "chmod 600 '${WEBHUSET_REMOTE_PATH}/.env'"
+            fi
+          }
+
+          if [ -f ".env" ]; then
+            upload_env_file ".env"
+            echo "Production .env provisioned from committed .env."
+            exit 0
+          fi
+
           PROD_DB_HOST="${DB_HOST:-${MYSQL_HOST:-${DATABASE_HOST:-}}}"
           PROD_DB_NAME="${DB_NAME:-${MYSQL_DATABASE:-${DATABASE_NAME:-}}}"
           PROD_DB_USER="${DB_USER:-${MYSQL_USER:-${DATABASE_USER:-}}}"
@@ -155,24 +182,7 @@ jobs:
             if [ -n "${SUPPORT_LABEL:-}" ]; then printf 'SUPPORT_LABEL=%s\n' "$SUPPORT_LABEL"; fi
           } > "$env_file"
 
-          if [ -z "${WEBHUSET_SSH_KEY:-}" ] && [ -n "${WEBHUSET_PASSWORD:-}" ]; then
-            sshpass -p "${WEBHUSET_PASSWORD}" \
-              scp -P "${WEBHUSET_PORT:-22}" \
-              "$env_file" \
-              "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}:${WEBHUSET_REMOTE_PATH}/.env"
-            sshpass -p "${WEBHUSET_PASSWORD}" \
-              ssh -p "${WEBHUSET_PORT:-22}" \
-              "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}" \
-              "chmod 600 '${WEBHUSET_REMOTE_PATH}/.env'"
-          else
-            scp -P "${WEBHUSET_PORT:-22}" \
-              "$env_file" \
-              "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}:${WEBHUSET_REMOTE_PATH}/.env"
-            ssh -p "${WEBHUSET_PORT:-22}" \
-              "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}" \
-              "chmod 600 '${WEBHUSET_REMOTE_PATH}/.env'"
-          fi
-
+          upload_env_file "$env_file"
           rm -f "$env_file"
           echo "Production .env provisioned from GitHub Secrets."
 

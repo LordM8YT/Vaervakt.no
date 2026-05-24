@@ -116,17 +116,16 @@ async function persistSubscription(subscription) {
 }
 
 function addPushButton() {
-  const nav = document.querySelector('[data-nav-item="alerts"]');
-  if (!nav) return;
+  const buttons = [document.querySelector('#push-action-button')].filter(Boolean);
 
-  nav.addEventListener('click', async () => {
+  buttons.forEach((button) => button.addEventListener('click', async () => {
     if (!pushConfig.vapidPublicKey) {
       notify('Legg inn VAPID public key i meta-taggen først.');
       return;
     }
 
     await subscribeToPush();
-  });
+  }));
 }
 
 document.addEventListener('DOMContentLoaded', () => {

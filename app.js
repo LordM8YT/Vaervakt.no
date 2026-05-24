@@ -25,10 +25,10 @@ const weatherState = {
     { day: 'TOR', icon: '⛅', temp: 16, width: 65 },
   ],
   observations: [
-    { icon: '☀️', time: 'omtrent 3 timer siden', reporter: 'Patrick i Kristiansand', condition: 'Sol / Klart', temp: 19 },
-    { icon: '☁️', time: 'omtrent 3 timer siden', reporter: 'Marte i Lillesand', condition: 'Overskyet', temp: 15 },
-    { icon: '🌧️', time: 'omtrent 3 timer siden', reporter: 'Lars i Mandal', condition: 'Regn / Byger', temp: 12 },
+    { icon: '⏳', time: 'Laster', reporter: 'Henter observasjoner', condition: 'Kobler til databasen', temp: 0 },
   ],
+  map: null,
+  mapMarkers: [],
 };
 
 const navItems = [
@@ -160,20 +160,45 @@ function renderObservations() {
   const list = document.querySelector('#observations-list');
   if (!list) return;
 
-  list.replaceChildren(...weatherState.observations.map((item) => {
+  list.replaceChildren(...weatherState.observations.map(createObservationElement));
+}
+
+function createObservationElement(item) {
     const row = document.createElement('article');
     row.className = 'obs-item';
     row.innerHTML = `
-      <span class="obs-icon" aria-hidden="true">${item.icon}</span>
+      <span class="obs-icon" aria-hidden="true">${escapeHtml(item.icon)}</span>
       <div class="obs-body">
-        <p class="obs-time">${item.time}</p>
-        <p class="obs-name">${item.reporter}</p>
-        <p class="obs-condition">${item.condition}</p>
+        <p class="obs-time">${escapeHtml(item.time)}</p>
+        <p class="obs-name">${escapeHtml(item.reporter)}</p>
+        <p class="obs-condition">${escapeHtml(item.condition)}</p>
       </div>
-      <span class="obs-temp">${item.temp}°</span>
+      <span class="obs-temp">${Number(item.temp) || 0}°</span>
     `;
     return row;
-  }));
+}
+
+async function loadReports() {
+  try {
+    const response = await fetch('api/reports.php?limit=20', {
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.message || 'Kunne ikke hente rapporter');
+    }
+
+    weatherState.observations = payload.reports.length
+      ? payload.reports
+      : [{ icon: '🌤️', time: 'Ingen data', reporter: 'Ingen observasjoner ennå', condition: 'Send den første rapporten', temp: 0 }];
+  } catch (error) {
+    console.warn('Kunne ikke hente DB-observasjoner:', error);
+    weatherState.observations = [{ icon: '⚠️', time: 'API utilgjengelig', reporter: 'Kunne ikke hente observasjoner', condition: 'Sjekk DB/API-oppsett', temp: 0 }];
+  }
+
+  renderObservations();
+  renderMapView();
 }
 
 function renderNavigation() {
@@ -196,12 +221,161 @@ function renderNavigation() {
 }
 
 function setActiveNavItem(activeId) {
+  document.querySelectorAll('[data-view]').forEach((view) => {
+    view.classList.toggle('hidden-view', view.dataset.view !== activeId);
+  });
+
   document.querySelectorAll('[data-nav-item]').forEach((button) => {
     const isActive = button.dataset.navItem === activeId;
     button.dataset.active = String(isActive);
     const icon = button.querySelector('svg');
     if (icon) icon.setAttribute('stroke-width', isActive ? '2.2' : '1.7');
   });
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (activeId === 'map') renderMapView();
+  if (activeId === 'favorites') renderFavorites();
+}
+
+function renderMapList() {
+  const list = document.querySelector('#map-list');
+  if (!list) return;
+
+  const located = weatherState.observations.filter((item) => item.lat && item.lon);
+  const items = located.length ? located : weatherState.observations;
+  list.replaceChildren(...items.map(createObservationElement));
+}
+
+function renderMapView() {
+  renderMapList();
+  initMap();
+  renderMapMarkers();
+}
+
+function initMap() {
+  const mapEl = document.querySelector('#leaflet-map');
+  if (!mapEl || weatherState.map || typeof L === 'undefined') return;
+
+  weatherState.map = L.map(mapEl, {
+    zoomControl: true,
+    attributionControl: false,
+  }).setView([58.1504, 7.9470], 9);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap',
+  }).addTo(weatherState.map);
+}
+
+function renderMapMarkers() {
+  const status = document.querySelector('#map-status');
+  if (!weatherState.map) {
+    if (status) status.textContent = typeof L === 'undefined' ? 'Kartbiblioteket kunne ikke lastes.' : 'Kartet klargjøres...';
+    return;
+  }
+
+  weatherState.mapMarkers.forEach((marker) => marker.remove());
+  weatherState.mapMarkers = [];
+
+  const located = weatherState.observations.filter((item) => Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lon)));
+  if (!located.length) {
+    weatherState.map.setView([58.1504, 7.9470], 9);
+    if (status) status.textContent = 'Ingen rapporter med koordinater ennå. Listen under viser DB-observasjoner uten kartpunkt.';
+    window.setTimeout(() => weatherState.map.invalidateSize(), 80);
+    return;
+  }
+
+  const bounds = [];
+  located.forEach((item) => {
+    const latLng = [Number(item.lat), Number(item.lon)];
+    bounds.push(latLng);
+    const marker = L.marker(latLng)
+      .addTo(weatherState.map)
+      .bindPopup(`<strong>${escapeHtml(item.reporter)}</strong><br>${escapeHtml(item.condition)} · ${Number(item.temp) || 0}°`);
+    weatherState.mapMarkers.push(marker);
+  });
+
+  weatherState.map.fitBounds(bounds, { padding: [28, 28], maxZoom: 13 });
+  if (status) status.textContent = `${located.length} observasjon${located.length === 1 ? '' : 'er'} med kartpunkt.`;
+  window.setTimeout(() => weatherState.map.invalidateSize(), 80);
+}
+
+function renderFavorites() {
+  const list = document.querySelector('#favorites-list');
+  if (!list) return;
+
+  const favorites = JSON.parse(localStorage.getItem('vaervakt_favorites') || '[]');
+  if (!favorites.length) {
+    const empty = document.createElement('p');
+    empty.className = 'empty-state';
+    empty.textContent = 'Ingen favoritter lagret ennå.';
+    list.replaceChildren(empty);
+    return;
+  }
+
+  list.replaceChildren(...favorites.map((favorite) => {
+    const item = document.createElement('div');
+    item.className = 'empty-state';
+    item.textContent = favorite.name || favorite.location || 'Lagret sted';
+    return item;
+  }));
+}
+
+function bindReportForm() {
+  const form = document.querySelector('#report-form');
+  if (!form) return;
+
+  const positionButton = document.querySelector('#use-position-button');
+  if (positionButton) {
+    positionButton.addEventListener('click', () => {
+      if (!navigator.geolocation) {
+        showToast('Posisjon støttes ikke i denne nettleseren.');
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition((position) => {
+        document.querySelector('#report-lat').value = String(position.coords.latitude);
+        document.querySelector('#report-lon').value = String(position.coords.longitude);
+        showToast('Posisjon lagt til rapporten.');
+      }, () => {
+        showToast('Kunne ikke hente posisjon.');
+      }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+    });
+  }
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(form).entries());
+
+    try {
+      const response = await fetch('api/report.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.message || 'Kunne ikke lagre rapport');
+      }
+
+      showToast('Rapport sendt.');
+      form.reset();
+      await loadReports();
+      setActiveNavItem('home');
+    } catch (error) {
+      showToast(error.message || 'Kunne ikke sende rapport.');
+    }
+  });
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;',
+  }[char]));
 }
 
 function showToast(message, timeout = 3200) {
@@ -223,6 +397,9 @@ function initApp() {
   renderForecast();
   renderObservations();
   renderNavigation();
+  bindReportForm();
+  renderFavorites();
+  loadReports();
   window.setInterval(updateClock, 30_000);
 }
 

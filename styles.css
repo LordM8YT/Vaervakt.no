@@ -44,6 +44,14 @@ html {
   padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
 }
 
+.app-view {
+  gap: 2rem;
+}
+
+.hidden-view {
+  display: none;
+}
+
 .vv-text {
   color: var(--vv-text);
 }
@@ -76,12 +84,20 @@ html {
   gap: 1.25rem;
 }
 
+.gap-8 {
+  gap: 2rem;
+}
+
 .mb-2 {
   margin-bottom: 0.5rem;
 }
 
 .mb-5 {
   margin-bottom: 1.25rem;
+}
+
+.mt-5 {
+  margin-top: 1.25rem;
 }
 
 .pt-2 {
@@ -355,6 +371,53 @@ html {
 .vv-btn-ghost:hover {
   background: rgba(255, 255, 255, 0.08);
   color: var(--vv-text);
+}
+
+.form-field {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  padding: 0.9rem 1rem;
+  background: rgba(2, 6, 23, 0.34);
+  color: var(--vv-text);
+  outline: none;
+}
+
+.form-field:focus {
+  border-color: rgba(119, 200, 255, 0.45);
+}
+
+.primary-button {
+  min-height: 3rem;
+  border-radius: 1rem;
+  padding: 0.85rem 1rem;
+  background: var(--vv-accent-strong);
+  color: #04111d;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.empty-state {
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 1rem;
+  padding: 1rem;
+  color: var(--vv-text-muted);
+  font-size: 0.88rem;
+}
+
+.vv-map {
+  height: min(58vh, 24rem);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.25rem;
+  background: rgba(2, 6, 23, 0.36);
+}
+
+.leaflet-container {
+  background: #07101d;
+  color: #0f172a;
 }
 
 .bottom-nav {

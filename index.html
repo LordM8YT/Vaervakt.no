@@ -8,6 +8,7 @@
     <meta name="vapid-public-key" content="">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="icons/vaervakt-icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
     <link rel="stylesheet" href="tailwind.css">
     <link rel="stylesheet" href="styles.css">
     <title>Værvakt 2026</title>
@@ -15,6 +16,7 @@
   <body class="vaervakt-body text-white">
     <div id="root" class="app-root relative">
       <main class="app-main mx-auto flex w-full max-w-xl flex-col px-5">
+        <div class="app-view flex flex-col gap-8" data-view="home">
         <section aria-labelledby="current-weather-title" class="pt-2">
           <div class="mb-6">
             <p id="current-weather-title" class="vv-text text-base font-bold">Kristiansand, NO</p>
@@ -105,6 +107,60 @@
             <span aria-hidden="true">›</span>
           </button>
         </section>
+        </div>
+
+        <section class="app-view hidden-view glass-card p-5" data-view="map" aria-labelledby="map-title">
+          <p class="section-label">Kart</p>
+          <h1 id="map-title" class="vv-text mt-3 text-xl font-bold">Lokale observasjoner</h1>
+          <div id="leaflet-map" class="vv-map mt-5"></div>
+          <p id="map-status" class="vv-muted mt-3 text-sm">Henter kartpunkter...</p>
+          <div id="map-list" class="mt-5 flex flex-col gap-3"></div>
+        </section>
+
+        <section class="app-view hidden-view glass-card p-5" data-view="report" aria-labelledby="report-title">
+          <p class="section-label">Rapporter</p>
+          <h1 id="report-title" class="vv-text mt-3 text-xl font-bold">Ny observasjon</h1>
+          <form id="report-form" class="mt-5 flex flex-col gap-3">
+            <label class="sr-only" for="report-name">Navn</label>
+            <input id="report-name" name="user" class="form-field" autocomplete="nickname" maxlength="50" required placeholder="Ditt navn">
+
+            <label class="sr-only" for="report-condition">Værtype</label>
+            <select id="report-condition" name="condition" class="form-field" required>
+              <option value="">Velg værtype</option>
+              <option value="Sol / Klart">Sol / Klart</option>
+              <option value="Overskyet">Overskyet</option>
+              <option value="Regn / Byger">Regn / Byger</option>
+              <option value="Snø / Sludd">Snø / Sludd</option>
+              <option value="Tåke">Tåke</option>
+              <option value="Kraftig vind">Kraftig vind</option>
+            </select>
+
+            <label class="sr-only" for="report-location">Sted</label>
+            <input id="report-location" name="location" class="form-field" autocomplete="address-level2" maxlength="100" required placeholder="Sted eller nabolag">
+
+            <label class="sr-only" for="report-temp">Temperatur</label>
+            <input id="report-temp" name="temp" class="form-field" inputmode="decimal" type="number" step="0.1" required placeholder="Temperatur °C">
+
+            <input id="report-lat" name="lat" type="hidden">
+            <input id="report-lon" name="lon" type="hidden">
+            <button id="use-position-button" class="vv-btn-ghost flex min-h-11 w-full items-center justify-center gap-2 text-sm font-semibold" type="button">Bruk min posisjon på kartet</button>
+
+            <button class="primary-button" type="submit">Send værrapport</button>
+          </form>
+        </section>
+
+        <section class="app-view hidden-view glass-card p-5" data-view="favorites" aria-labelledby="favorites-title">
+          <p class="section-label">Favoritter</p>
+          <h1 id="favorites-title" class="vv-text mt-3 text-xl font-bold">Lagrede steder</h1>
+          <div id="favorites-list" class="mt-5 flex flex-col gap-3"></div>
+        </section>
+
+        <section class="app-view hidden-view glass-card p-5" data-view="alerts" aria-labelledby="alerts-title">
+          <p class="section-label">Varsler</p>
+          <h1 id="alerts-title" class="vv-text mt-3 text-xl font-bold">Push-varsler</h1>
+          <p id="push-copy" class="vv-soft mt-3 text-sm leading-relaxed">Aktiver push-varsler for lokale væroppdateringer når VAPID-nøkkelen er satt.</p>
+          <button id="push-action-button" class="primary-button mt-5" type="button">Aktiver varsler</button>
+        </section>
       </main>
 
       <nav class="bottom-nav" aria-label="Hovednavigasjon">
@@ -114,6 +170,7 @@
       <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
     </div>
 
+    <script src="vendor/leaflet/leaflet.js" defer></script>
     <script src="app.js" defer></script>
     <script src="script.js" defer></script>
   </body>

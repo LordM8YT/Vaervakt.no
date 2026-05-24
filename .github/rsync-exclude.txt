@@ -1,5 +1,12 @@
+.env
+.env.*
 .git/
 .github/
+.gitignore
+.vscode/
 .DS_Store
 node_modules/
 repo/
+*.log
+*.sql.bak
+*.zip

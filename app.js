@@ -198,7 +198,11 @@ async function loadReports() {
   }
 
   renderObservations();
-  renderMapView();
+  if (isViewVisible('map')) {
+    renderMapView();
+  } else {
+    renderMapList();
+  }
 }
 
 function renderNavigation() {
@@ -241,15 +245,25 @@ function renderMapList() {
   const list = document.querySelector('#map-list');
   if (!list) return;
 
-  const located = weatherState.observations.filter((item) => item.lat && item.lon);
+  const located = weatherState.observations.filter((item) => Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lon)));
   const items = located.length ? located : weatherState.observations;
   list.replaceChildren(...items.map(createObservationElement));
 }
 
 function renderMapView() {
+  if (!isViewVisible('map')) {
+    renderMapList();
+    return;
+  }
+
   renderMapList();
   initMap();
   renderMapMarkers();
+}
+
+function isViewVisible(viewName) {
+  const view = document.querySelector(`[data-view="${viewName}"]`);
+  return Boolean(view && !view.classList.contains('hidden-view'));
 }
 
 function initMap() {
@@ -265,6 +279,8 @@ function initMap() {
     maxZoom: 19,
     attribution: '&copy; OpenStreetMap',
   }).addTo(weatherState.map);
+
+  window.setTimeout(() => weatherState.map.invalidateSize(), 80);
 }
 
 function renderMapMarkers() {

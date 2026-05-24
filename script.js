@@ -145,8 +145,10 @@ function addPushButton() {
   const buttons = [document.querySelector('#push-action-button')].filter(Boolean);
 
   buttons.forEach((button) => button.addEventListener('click', async () => {
+    await loadPushConfig();
+
     if (!pushConfig.vapidPublicKey) {
-      notify('Legg inn VAPID public key i meta-taggen først.');
+      notify('Legg inn VAPID public key i .env først.');
       return;
     }
 

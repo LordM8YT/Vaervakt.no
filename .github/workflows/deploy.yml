@@ -79,6 +79,32 @@ jobs:
               "mkdir -p '${WEBHUSET_REMOTE_PATH}'"
           fi
 
+      - name: Locate existing production .env
+        env:
+          WEBHUSET_HOST: linweb22.hmg9.webhuset.no
+          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD }}
+          WEBHUSET_PORT: 22
+          WEBHUSET_REMOTE_PATH: /home/X/xnvrvaktpuano/www
+          WEBHUSET_SSH_KEY: ${{ secrets.WEBHUSET_SSH_KEY }}
+          WEBHUSET_USERNAME: xnvrvaktpuano
+        run: |
+          set -eu
+
+          remote_find_command="find /home/X/xnvrvaktpuano -maxdepth 5 -type f \( -name '.env' -o -name '.env.local' -o -name '.env.production' \) -printf '%p\n' 2>/dev/null | sed 's#^/home/X/xnvrvaktpuano#~#'"
+
+          if [ -z "${WEBHUSET_SSH_KEY:-}" ] && [ -n "${WEBHUSET_PASSWORD:-}" ]; then
+            found="$(sshpass -p "${WEBHUSET_PASSWORD}" ssh -p "${WEBHUSET_PORT:-22}" "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}" "$remote_find_command" || true)"
+          else
+            found="$(ssh -p "${WEBHUSET_PORT:-22}" "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}" "$remote_find_command" || true)"
+          fi
+
+          if [ -n "$found" ]; then
+            echo "Found existing env file(s):"
+            printf '%s\n' "$found"
+          else
+            echo "No existing .env file found under account home."
+          fi
+
       - name: Provision production .env from secrets
         env:
           DATABASE_HOST: ${{ secrets.DATABASE_HOST }}

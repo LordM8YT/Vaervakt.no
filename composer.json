@@ -1,7 +1,0 @@
-{
-  "name": "vaervakt/vaervakt",
-  "description": "Værvakt.no - lokal værrapportering",
-  "require": {
-    "minishlink/web-push": "^6.0"
-  }
-}

@@ -79,6 +79,90 @@ jobs:
               "mkdir -p '${WEBHUSET_REMOTE_PATH}'"
           fi
 
+      - name: Provision production .env from secrets
+        env:
+          DATABASE_HOST: ${{ secrets.DATABASE_HOST }}
+          DATABASE_NAME: ${{ secrets.DATABASE_NAME }}
+          DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
+          DATABASE_PORT: ${{ secrets.DATABASE_PORT }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_USER: ${{ secrets.DATABASE_USER }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_PASS: ${{ secrets.DB_PASS }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_USER: ${{ secrets.DB_USER }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT }}
+          MYSQL_USER: ${{ secrets.MYSQL_USER }}
+          SUPPORT_LABEL: ${{ secrets.SUPPORT_LABEL }}
+          SUPPORT_URL: ${{ secrets.SUPPORT_URL }}
+          VAERVAKT_DEBUG: ${{ secrets.VAERVAKT_DEBUG }}
+          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_PUBLIC: ${{ secrets.VAPID_PUBLIC }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+          WEBHUSET_HOST: linweb22.hmg9.webhuset.no
+          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD }}
+          WEBHUSET_PORT: 22
+          WEBHUSET_REMOTE_PATH: /home/X/xnvrvaktpuano/www
+          WEBHUSET_SSH_KEY: ${{ secrets.WEBHUSET_SSH_KEY }}
+          WEBHUSET_USERNAME: xnvrvaktpuano
+        run: |
+          set -eu
+
+          PROD_DB_HOST="${DB_HOST:-${MYSQL_HOST:-${DATABASE_HOST:-}}}"
+          PROD_DB_NAME="${DB_NAME:-${MYSQL_DATABASE:-${DATABASE_NAME:-}}}"
+          PROD_DB_USER="${DB_USER:-${MYSQL_USER:-${DATABASE_USER:-}}}"
+          PROD_DB_PASS="${DB_PASS:-${MYSQL_PASSWORD:-${DATABASE_PASSWORD:-}}}"
+          PROD_DB_PORT="${DB_PORT:-${MYSQL_PORT:-${DATABASE_PORT:-}}}"
+
+          if [ -z "${DATABASE_URL:-}" ] && { [ -z "$PROD_DB_HOST" ] || [ -z "$PROD_DB_NAME" ] || [ -z "$PROD_DB_USER" ]; }; then
+            echo "Skipping .env provisioning: missing DB_HOST, DB_NAME or DB_USER GitHub secret."
+            exit 0
+          fi
+
+          umask 077
+          env_file="$(mktemp)"
+          {
+            if [ -n "${DATABASE_URL:-}" ]; then printf 'DATABASE_URL=%s\n' "$DATABASE_URL"; fi
+            if [ -n "$PROD_DB_HOST" ]; then printf 'DB_HOST=%s\n' "$PROD_DB_HOST"; fi
+            if [ -n "$PROD_DB_NAME" ]; then printf 'DB_NAME=%s\n' "$PROD_DB_NAME"; fi
+            if [ -n "$PROD_DB_USER" ]; then printf 'DB_USER=%s\n' "$PROD_DB_USER"; fi
+            printf 'DB_PASS=%s\n' "$PROD_DB_PASS"
+            if [ -n "$PROD_DB_PORT" ]; then printf 'DB_PORT=%s\n' "$PROD_DB_PORT"; fi
+            if [ -n "${VAPID_PUBLIC_KEY:-${VAPID_PUBLIC:-}}" ]; then printf 'VAPID_PUBLIC_KEY=%s\n' "${VAPID_PUBLIC_KEY:-${VAPID_PUBLIC:-}}"; fi
+            if [ -n "${VAPID_PRIVATE_KEY:-${VAPID_PRIVATE:-}}" ]; then printf 'VAPID_PRIVATE_KEY=%s\n' "${VAPID_PRIVATE_KEY:-${VAPID_PRIVATE:-}}"; fi
+            printf 'VAPID_SUBJECT=%s\n' "${VAPID_SUBJECT:-mailto:patrick@vaarvakt.no}"
+            printf 'VAERVAKT_DEBUG=%s\n' "${VAERVAKT_DEBUG:-0}"
+            if [ -n "${SUPPORT_URL:-}" ]; then printf 'SUPPORT_URL=%s\n' "$SUPPORT_URL"; fi
+            if [ -n "${SUPPORT_LABEL:-}" ]; then printf 'SUPPORT_LABEL=%s\n' "$SUPPORT_LABEL"; fi
+          } > "$env_file"
+
+          if [ -z "${WEBHUSET_SSH_KEY:-}" ] && [ -n "${WEBHUSET_PASSWORD:-}" ]; then
+            sshpass -p "${WEBHUSET_PASSWORD}" \
+              scp -P "${WEBHUSET_PORT:-22}" \
+              "$env_file" \
+              "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}:${WEBHUSET_REMOTE_PATH}/.env"
+            sshpass -p "${WEBHUSET_PASSWORD}" \
+              ssh -p "${WEBHUSET_PORT:-22}" \
+              "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}" \
+              "chmod 600 '${WEBHUSET_REMOTE_PATH}/.env'"
+          else
+            scp -P "${WEBHUSET_PORT:-22}" \
+              "$env_file" \
+              "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}:${WEBHUSET_REMOTE_PATH}/.env"
+            ssh -p "${WEBHUSET_PORT:-22}" \
+              "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}" \
+              "chmod 600 '${WEBHUSET_REMOTE_PATH}/.env'"
+          fi
+
+          rm -f "$env_file"
+          echo "Production .env provisioned from GitHub Secrets."
+
       - name: Sync PWA to Webhuset
         timeout-minutes: 5
         env:

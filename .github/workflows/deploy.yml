@@ -121,8 +121,21 @@ jobs:
           PROD_DB_PORT="${DB_PORT:-${MYSQL_PORT:-${DATABASE_PORT:-}}}"
 
           if [ -z "${DATABASE_URL:-}" ] && { [ -z "$PROD_DB_HOST" ] || [ -z "$PROD_DB_NAME" ] || [ -z "$PROD_DB_USER" ]; }; then
-            echo "Skipping .env provisioning: missing DB_HOST, DB_NAME or DB_USER GitHub secret."
-            exit 0
+            remote_env_check="test -s '${WEBHUSET_REMOTE_PATH}/.env' && grep -q '^DB_HOST=' '${WEBHUSET_REMOTE_PATH}/.env' && grep -q '^DB_NAME=' '${WEBHUSET_REMOTE_PATH}/.env' && grep -q '^DB_USER=' '${WEBHUSET_REMOTE_PATH}/.env'"
+            if [ -z "${WEBHUSET_SSH_KEY:-}" ] && [ -n "${WEBHUSET_PASSWORD:-}" ]; then
+              if sshpass -p "${WEBHUSET_PASSWORD}" ssh -p "${WEBHUSET_PORT:-22}" "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}" "$remote_env_check"; then
+                echo "Using existing production .env on Webhuset."
+                exit 0
+              fi
+            else
+              if ssh -p "${WEBHUSET_PORT:-22}" "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}" "$remote_env_check"; then
+                echo "Using existing production .env on Webhuset."
+                exit 0
+              fi
+            fi
+
+            echo "::error::Production .env is missing, and GitHub Secrets do not include DB_HOST, DB_NAME and DB_USER. Add DB/VAPID secrets in GitHub or create ${WEBHUSET_REMOTE_PATH}/.env on Webhuset."
+            exit 1
           fi
 
           umask 077

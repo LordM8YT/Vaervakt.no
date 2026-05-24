@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="nb">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#07101d">
+    <meta name="description" content="Værvakt 2026 viser lokal værpuls, observasjoner og push-varsler i en frittstående PWA.">
+    <meta name="vapid-public-key" content="">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icons/vaervakt-icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="tailwind.css">
+    <link rel="stylesheet" href="styles.css">
+    <title>Værvakt 2026</title>
+  </head>
+  <body class="vaervakt-body text-white">
+    <div id="root" class="app-root relative">
+      <main class="app-main mx-auto flex w-full max-w-xl flex-col px-5">
+        <section aria-labelledby="current-weather-title" class="pt-2">
+          <div class="mb-6">
+            <p id="current-weather-title" class="vv-text text-base font-bold">Kristiansand, NO</p>
+            <p id="clock" class="vv-muted mt-1 text-sm">--:--</p>
+          </div>
+
+          <div class="flex items-start gap-2">
+            <span id="temperature" class="weather-temp vv-text">21</span>
+            <span class="weather-unit vv-text">°C</span>
+          </div>
+
+          <p class="vv-muted mt-3 text-base">
+            Kjennes som
+            <span id="feels-like" class="vv-soft font-semibold">21°C</span>
+          </p>
+        </section>
+
+        <div class="vv-divider" role="presentation"></div>
+
+        <section aria-labelledby="rain-title">
+          <div class="mb-4 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-2">
+              <span aria-hidden="true" class="text-lg">🌧</span>
+              <h2 id="rain-title" class="vv-text text-base font-bold">Nedbør neste 6 timer</h2>
+            </div>
+            <p id="rain-summary" class="vv-muted text-right text-xs font-semibold">Ingen nedbør forventet</p>
+          </div>
+
+          <div class="chart-panel">
+            <svg id="rain-chart" class="h-full w-full" viewBox="0 0 500 144" role="img" aria-label="Nedbørsgraf for de neste seks timene"></svg>
+          </div>
+
+          <div class="mt-2 flex gap-5">
+            <div class="flex items-center gap-2">
+              <span class="legend-block legend-rain" aria-hidden="true"></span>
+              <span class="vv-muted text-xs">Mengde (mm)</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="legend-line legend-probability" aria-hidden="true"></span>
+              <span class="vv-muted text-xs">Sannsynlighet (%)</span>
+            </div>
+          </div>
+        </section>
+
+        <div class="vv-divider" role="presentation"></div>
+
+        <section aria-labelledby="temp-title">
+          <h2 id="temp-title" class="vv-text mb-4 text-base font-bold">Dagens temperatur</h2>
+          <div class="chart-panel chart-panel--short">
+            <svg id="temperature-chart" class="h-full w-full" viewBox="0 0 500 128" role="img" aria-label="Temperaturgraf for kvelden"></svg>
+          </div>
+        </section>
+
+        <div class="vv-divider" role="presentation"></div>
+
+        <section aria-labelledby="forecast-title">
+          <h2 id="forecast-title" class="vv-text mb-4 text-base font-bold">5-dagers varsel</h2>
+          <div id="forecast-list" class="flex flex-col gap-1"></div>
+        </section>
+
+        <div class="vv-divider" role="presentation"></div>
+
+        <section class="glass-card p-5" aria-labelledby="observations-title">
+          <div class="mb-5 flex items-center justify-between gap-4">
+            <h2 id="observations-title" class="section-label">Siste observasjoner</h2>
+            <span class="live-pill">
+              <span class="live-dot" aria-hidden="true"></span>
+              Live nå
+            </span>
+          </div>
+          <div id="observations-list" class="flex flex-col gap-2"></div>
+        </section>
+
+        <section class="glass-card p-5" aria-labelledby="patchnote-title">
+          <p class="section-label">Nyeste patchnote</p>
+          <article class="patch-card mt-3">
+            <div class="mb-2 flex items-center gap-2">
+              <span class="new-badge">Nytt</span>
+              <time class="vv-muted text-xs" datetime="2026-05-20">20.05.2026</time>
+            </div>
+            <h2 id="patchnote-title" class="vv-text mb-1 text-base font-bold">Stor app-oppdatering</h2>
+            <p class="vv-soft text-sm leading-relaxed">
+              Værvakt er nærmere en ekte mobilapp, med mer stabil rapportflyt og bedre handoff for videre utvikling.
+            </p>
+          </article>
+          <button id="patchnotes-button" class="vv-btn-ghost mt-3 flex min-h-11 w-full items-center justify-center gap-2 text-sm font-semibold">
+            Se alle patchnotes
+            <span aria-hidden="true">›</span>
+          </button>
+        </section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="Hovednavigasjon">
+        <div id="bottom-nav-items" class="bottom-nav-inner mx-auto flex justify-around"></div>
+      </nav>
+
+      <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+    </div>
+
+    <script src="app.js" defer></script>
+    <script src="script.js" defer></script>
+  </body>
+</html>

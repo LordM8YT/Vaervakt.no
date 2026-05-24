@@ -1,29 +1,21 @@
 {
   "id": "/",
-  "name": "Værvakt.no",
+  "name": "Værvakt 2026",
   "short_name": "Værvakt",
-  "description": "Lokale værobservasjoner, kart og raske rapporter fra der du er.",
+  "description": "Frittstående PWA for lokal værpuls, observasjoner og push-varsler.",
   "lang": "nb-NO",
-  "start_url": "/index.php",
-  "scope": "/",
+  "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0b0f1a",
-  "theme_color": "#0b0f1a",
+  "background_color": "#07101d",
+  "theme_color": "#07101d",
   "icons": [
     {
-      "src": "/icons/vaervakt-icon.svg",
+      "src": "icons/vaervakt-icon.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any maskable"
-    }
-  ],
-  "shortcuts": [
-    {
-      "name": "Ny rapport",
-      "short_name": "Rapporter",
-      "url": "/index.php#reportForm",
-      "description": "Gå rett til skjemaet for å sende en ny værrapport."
     }
   ]
 }

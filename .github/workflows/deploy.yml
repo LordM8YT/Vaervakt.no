@@ -98,7 +98,6 @@ jobs:
               --links \
               --compress \
               --timeout=60 \
-              --contimeout=30 \
               --delete \
               --human-readable \
               --itemize-changes \
@@ -118,7 +117,6 @@ jobs:
               --links \
               --compress \
               --timeout=60 \
-              --contimeout=30 \
               --delete \
               --human-readable \
               --itemize-changes \

@@ -7,6 +7,7 @@
 .DS_Store
 node_modules/
 repo/
+statistikk/
 *.log
 *.sql.bak
 *.zip

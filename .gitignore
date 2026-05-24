@@ -18,7 +18,9 @@ dist-ssr
 .env
 .env.*
 !.env.example
-vendor/
+vendor/*
+!vendor/leaflet/
+!vendor/leaflet/**
 
 # Wrangler / Cloudflare
 .wrangler/

@@ -283,6 +283,16 @@ function initMap() {
   window.setTimeout(() => weatherState.map.invalidateSize(), 80);
 }
 
+function createMapMarkerIcon() {
+  return L.divIcon({
+    className: 'vv-map-marker',
+    html: '<span aria-hidden="true"></span>',
+    iconSize: [28, 28],
+    iconAnchor: [14, 28],
+    popupAnchor: [0, -24],
+  });
+}
+
 function renderMapMarkers() {
   const status = document.querySelector('#map-status');
   if (!weatherState.map) {
@@ -305,7 +315,7 @@ function renderMapMarkers() {
   located.forEach((item) => {
     const latLng = [Number(item.lat), Number(item.lon)];
     bounds.push(latLng);
-    const marker = L.marker(latLng)
+    const marker = L.marker(latLng, { icon: createMapMarkerIcon() })
       .addTo(weatherState.map)
       .bindPopup(`<strong>${escapeHtml(item.reporter)}</strong><br>${escapeHtml(item.condition)} · ${Number(item.temp) || 0}°`);
     weatherState.mapMarkers.push(marker);

@@ -30,7 +30,7 @@ jobs:
         env:
           WEBHUSET_HOST: linweb22.hmg9.webhuset.no
           WEBHUSET_KNOWN_HOSTS: ${{ secrets.WEBHUSET_KNOWN_HOSTS }}
-          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD || vars.WEBHUSET_PASSWORD }}
+          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD || secrets.VAERVAKT || vars.WEBHUSET_PASSWORD || vars.VAERVAKT }}
           WEBHUSET_PORT: 22
           WEBHUSET_SSH_KEY: ${{ secrets.WEBHUSET_SSH_KEY }}
           WEBHUSET_USERNAME: xnvrvaktpuano
@@ -61,7 +61,7 @@ jobs:
       - name: Ensure remote path exists
         env:
           WEBHUSET_HOST: linweb22.hmg9.webhuset.no
-          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD || vars.WEBHUSET_PASSWORD }}
+          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD || secrets.VAERVAKT || vars.WEBHUSET_PASSWORD || vars.VAERVAKT }}
           WEBHUSET_PORT: 22
           WEBHUSET_REMOTE_PATH: /home/X/xnvrvaktpuano/www
           WEBHUSET_SSH_KEY: ${{ secrets.WEBHUSET_SSH_KEY }}
@@ -84,7 +84,7 @@ jobs:
       - name: Locate existing production .env
         env:
           WEBHUSET_HOST: linweb22.hmg9.webhuset.no
-          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD || vars.WEBHUSET_PASSWORD }}
+          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD || secrets.VAERVAKT || vars.WEBHUSET_PASSWORD || vars.VAERVAKT }}
           WEBHUSET_PORT: 22
           WEBHUSET_REMOTE_PATH: /home/X/xnvrvaktpuano/www
           WEBHUSET_SSH_KEY: ${{ secrets.WEBHUSET_SSH_KEY }}
@@ -134,7 +134,7 @@ jobs:
           VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY || vars.VAPID_PUBLIC_KEY }}
           VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT || vars.VAPID_SUBJECT }}
           WEBHUSET_HOST: linweb22.hmg9.webhuset.no
-          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD || vars.WEBHUSET_PASSWORD }}
+          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD || secrets.VAERVAKT || vars.WEBHUSET_PASSWORD || vars.VAERVAKT }}
           WEBHUSET_PORT: 22
           WEBHUSET_REMOTE_PATH: /home/X/xnvrvaktpuano/www
           WEBHUSET_SSH_KEY: ${{ secrets.WEBHUSET_SSH_KEY }}
@@ -218,7 +218,7 @@ jobs:
         timeout-minutes: 5
         env:
           WEBHUSET_HOST: linweb22.hmg9.webhuset.no
-          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD || vars.WEBHUSET_PASSWORD }}
+          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD || secrets.VAERVAKT || vars.WEBHUSET_PASSWORD || vars.VAERVAKT }}
           WEBHUSET_PORT: 22
           WEBHUSET_REMOTE_PATH: /home/X/xnvrvaktpuano/www
           WEBHUSET_SSH_KEY: ${{ secrets.WEBHUSET_SSH_KEY }}

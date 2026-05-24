@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/config.php';
 
+class VaervaktDatabaseException extends RuntimeException {}
+
 function get_db_connection() {
     $host = defined('DB_HOST') ? DB_HOST : '';
     $db = defined('DB_NAME') ? DB_NAME : '';
@@ -12,7 +14,7 @@ function get_db_connection() {
     if ($host === '' || $db === '' || $user === '') {
         $message = 'Kunne ikke koble til databasen: mangler DB_HOST, DB_NAME eller DB_USER.';
         error_log($message);
-        die(defined('VAERVAKT_DEBUG') && VAERVAKT_DEBUG ? $message : 'Tjenesten er midlertidig utilgjengelig.');
+        throw new VaervaktDatabaseException($message);
     }
 
     $dsn = "mysql:host={$host};dbname={$db};charset={$charset}";
@@ -30,8 +32,16 @@ function get_db_connection() {
         return new PDO($dsn, $user, $pass, $options);
     } catch (\PDOException $e) {
         error_log('Database connection failed: ' . $e->getMessage());
-        die(defined('VAERVAKT_DEBUG') && VAERVAKT_DEBUG ? ('Kunne ikke koble til databasen: ' . $e->getMessage()) : 'Tjenesten er midlertidig utilgjengelig.');
+        throw new VaervaktDatabaseException('Kunne ikke koble til databasen: ' . $e->getMessage(), 0, $e);
     }
 }
 
-$pdo = get_db_connection();
+try {
+    $pdo = get_db_connection();
+} catch (VaervaktDatabaseException $e) {
+    if (defined('VAERVAKT_ALLOW_DB_EXCEPTION') && VAERVAKT_ALLOW_DB_EXCEPTION) {
+        throw $e;
+    }
+
+    die(defined('VAERVAKT_DEBUG') && VAERVAKT_DEBUG ? $e->getMessage() : 'Tjenesten er midlertidig utilgjengelig.');
+}

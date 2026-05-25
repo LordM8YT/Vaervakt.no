@@ -194,8 +194,8 @@ try {
         'success' => true,
         'source' => 'MET Norway Locationforecast 2.0 complete',
         'location' => [
-            'id' => 'kristiansand-no',
-            'name' => 'Kristiansand, NO',
+            'id' => (abs($lat - 58.1504) < 0.0001 && abs($lon - 7.9470) < 0.0001) ? 'kristiansand-no' : 'user-location',
+            'name' => (abs($lat - 58.1504) < 0.0001 && abs($lon - 7.9470) < 0.0001) ? 'Kristiansand, NO' : 'Din posisjon',
             'lat' => $lat,
             'lon' => $lon,
         ],

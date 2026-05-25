@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vaervakt-2026-v2';
+const CACHE_NAME = 'vaervakt-2026-v4';
 const PRECACHE_URLS = [
   './',
   './index.html',

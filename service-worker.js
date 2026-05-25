@@ -1,5 +1,5 @@
-const CACHE_NAME = 'vaervakt-2026-v8';
-const ASSET_VERSION = '20260525-reportfilter3';
+const CACHE_NAME = 'vaervakt-2026-v9';
+const ASSET_VERSION = '20260525-autorefresh1';
 const PRECACHE_URLS = [
   './',
   './index.html',

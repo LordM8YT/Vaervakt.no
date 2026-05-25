@@ -55,7 +55,7 @@ function notify(message) {
   }
 }
 
-const SERVICE_WORKER_VERSION = '20260525-reportfilter2';
+const SERVICE_WORKER_VERSION = '20260525-reportfilter3';
 
 async function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) {

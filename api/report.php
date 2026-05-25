@@ -38,6 +38,46 @@ function vv_weather_emoji(string $type): string
     return '☀️';
 }
 
+function vv_recent_duplicate_exists(
+    PDO $pdo,
+    string $table,
+    string $userColumn,
+    string $conditionColumn,
+    string $locationColumn,
+    string $temperatureColumn,
+    string $user,
+    string $condition,
+    string $location,
+    float $temperature
+): bool {
+    $sql = "SELECT COUNT(*) FROM {$table}
+        WHERE {$userColumn} = ?
+          AND {$conditionColumn} = ?
+          AND {$locationColumn} = ?
+          AND ABS({$temperatureColumn} - ?) < 0.01
+          AND created_at >= (NOW() - INTERVAL 20 SECOND)";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$user, $condition, $location, $temperature]);
+    return (int) $stmt->fetchColumn() > 0;
+}
+
+function vv_success_response(string $user, string $condition, string $location, float $temp, $lat, $lon, bool $duplicate = false): void
+{
+    echo json_encode([
+        'success' => true,
+        'duplicate' => $duplicate,
+        'report' => [
+            'icon' => vv_weather_emoji($condition),
+            'time' => 'Nå nettopp',
+            'reporter' => $user . ' i ' . $location,
+            'condition' => $condition,
+            'temp' => round($temp),
+            'lat' => $lat,
+            'lon' => $lon,
+        ],
+    ], JSON_UNESCAPED_UNICODE);
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     vv_json_error('Metoden er ikke støttet.', 405);
 }
@@ -66,6 +106,11 @@ $location = substr($location, 0, 100);
 try {
     if (vv_table_exists($pdo, 'weather_reports')) {
         $cols = vv_table_columns($pdo, 'weather_reports');
+        if (vv_recent_duplicate_exists($pdo, 'weather_reports', 'username', 'weather_condition', 'location', 'temperature', $user, $condition, $location, (float) $temp)) {
+            vv_success_response($user, $condition, $location, (float) $temp, $lat, $lon, true);
+            exit;
+        }
+
         $insertCols = ['username', 'weather_condition', 'location', 'temperature'];
         $values = [$user, $condition, $location, $temp];
         if ($lat !== null && in_array('latitude', $cols, true)) {
@@ -80,6 +125,11 @@ try {
         $stmt->execute($values);
     } elseif (vv_table_exists($pdo, 'reports')) {
         $cols = vv_table_columns($pdo, 'reports');
+        if (vv_recent_duplicate_exists($pdo, 'reports', 'reporter_name', 'conditions', 'location', 'temperature_c', $user, $condition, $location, (float) $temp)) {
+            vv_success_response($user, $condition, $location, (float) $temp, $lat, $lon, true);
+            exit;
+        }
+
         $insertCols = ['reporter_name', 'conditions', 'location', 'temperature_c'];
         $values = [$user, $condition, $location, $temp];
         if ($lat !== null && in_array('latitude', $cols, true)) {
@@ -96,18 +146,7 @@ try {
         throw new RuntimeException('No supported reports table found');
     }
 
-    echo json_encode([
-        'success' => true,
-        'report' => [
-            'icon' => vv_weather_emoji($condition),
-            'time' => 'Nå nettopp',
-            'reporter' => $user . ' i ' . $location,
-            'condition' => $condition,
-            'temp' => round((float) $temp),
-            'lat' => $lat,
-            'lon' => $lon,
-        ],
-    ], JSON_UNESCAPED_UNICODE);
+    vv_success_response($user, $condition, $location, (float) $temp, $lat, $lon);
 } catch (Throwable $error) {
     error_log('report api failed: ' . $error->getMessage());
     vv_json_error('Kunne ikke lagre rapporten akkurat nå.', 500);

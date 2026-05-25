@@ -504,7 +504,11 @@ function bindFavorites() {
 
 function bindReportForm() {
   const form = document.querySelector('#report-form');
-  if (!form) return;
+  if (!form || form.dataset.vaervaktBound === 'true') return;
+  form.dataset.vaervaktBound = 'true';
+
+  let isSubmitting = false;
+  const submitButton = form.querySelector('button[type="submit"]');
 
   const positionButton = document.querySelector('#use-position-button');
   if (positionButton) {
@@ -526,7 +530,16 @@ function bindReportForm() {
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (isSubmitting) return;
+
     const data = Object.fromEntries(new FormData(form).entries());
+    isSubmitting = true;
+    form.setAttribute('aria-busy', 'true');
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.dataset.originalText = submitButton.textContent || '';
+      submitButton.textContent = 'Sender…';
+    }
 
     try {
       const response = await fetch('api/report.php', {
@@ -545,6 +558,14 @@ function bindReportForm() {
       setActiveNavItem('home');
     } catch (error) {
       showToast(error.message || 'Kunne ikke sende rapport.');
+    } finally {
+      isSubmitting = false;
+      form.removeAttribute('aria-busy');
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = submitButton.dataset.originalText || 'Send værrapport';
+        delete submitButton.dataset.originalText;
+      }
     }
   });
 }

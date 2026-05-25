@@ -125,8 +125,12 @@ function vv_symbol(array $point): string
 }
 
 try {
-    $lat = isset($_GET['lat']) ? (float) $_GET['lat'] : 58.1504;
-    $lon = isset($_GET['lon']) ? (float) $_GET['lon'] : 7.9470;
+    $hasLat = isset($_GET['lat']) && $_GET['lat'] !== '';
+    $hasLon = isset($_GET['lon']) && $_GET['lon'] !== '';
+    $lat = $hasLat ? (float) $_GET['lat'] : 58.1504;
+    $lon = $hasLon ? (float) $_GET['lon'] : 7.9470;
+    $source = (string) ($_GET['source'] ?? 'default');
+    $isUserLocation = $source === 'user' && $hasLat && $hasLon;
     if ($lat < -90 || $lat > 90 || $lon < -180 || $lon > 180) {
         throw new InvalidArgumentException('Ugyldige koordinater.');
     }
@@ -194,10 +198,11 @@ try {
         'success' => true,
         'source' => 'MET Norway Locationforecast 2.0 complete',
         'location' => [
-            'id' => 'kristiansand-no',
-            'name' => 'Kristiansand, NO',
+            'id' => $isUserLocation ? sprintf('user-%0.4f-%0.4f', $lat, $lon) : 'kristiansand-no',
+            'name' => $isUserLocation ? 'Din posisjon' : 'Kristiansand, NO',
             'lat' => $lat,
             'lon' => $lon,
+            'source' => $isUserLocation ? 'user' : 'default',
         ],
         'current' => [
             'temperature' => vv_number((float) ($nowDetails['air_temperature'] ?? 0), 1),

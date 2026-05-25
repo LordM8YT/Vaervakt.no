@@ -4,6 +4,7 @@ const weatherState = {
     name: 'Kristiansand, NO',
     lat: 58.1504,
     lon: 7.9470,
+    source: 'default',
   },
   current: {
     temperature: 21,
@@ -52,6 +53,54 @@ const navItems = [
 ];
 
 const favoritesStorageKey = 'vaervakt_favorites';
+
+function isValidCoordinate(lat, lon) {
+  return Number.isFinite(lat) && Number.isFinite(lon)
+    && lat >= -90 && lat <= 90
+    && lon >= -180 && lon <= 180;
+}
+
+function getPosition(options = {}) {
+  if (!navigator.geolocation) {
+    return Promise.reject(new Error('Geolokasjon støttes ikke i denne nettleseren.'));
+  }
+
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0,
+      ...options,
+    });
+  });
+}
+
+function setWeatherLocationFromPosition(position) {
+  const lat = Number(position?.coords?.latitude);
+  const lon = Number(position?.coords?.longitude);
+  if (!isValidCoordinate(lat, lon)) {
+    throw new Error('Nettleseren ga ugyldige koordinater.');
+  }
+
+  weatherState.location = {
+    id: `user-${lat.toFixed(4)}-${lon.toFixed(4)}`,
+    name: 'Din posisjon',
+    lat: Number(lat.toFixed(6)),
+    lon: Number(lon.toFixed(6)),
+    source: 'user',
+  };
+}
+
+async function useUserLocationForWeather() {
+  try {
+    const position = await getPosition();
+    setWeatherLocationFromPosition(position);
+    return true;
+  } catch (error) {
+    console.warn('Kunne ikke hente brukerposisjon for værvarsel:', error);
+    return false;
+  }
+}
 
 function updateClock() {
   const clock = document.querySelector('#clock');
@@ -212,9 +261,21 @@ function renderWeatherMeta() {
   }
 }
 
-async function loadWeather() {
+async function loadWeather({ preferUserLocation = false } = {}) {
+  if (preferUserLocation) {
+    const usingUserLocation = await useUserLocationForWeather();
+    if (!usingUserLocation) {
+      showToast('Bruker Kristiansand som reserve fordi posisjon ikke kunne hentes.');
+    }
+  }
+
   try {
-    const response = await fetch(`api/weather.php?lat=${encodeURIComponent(weatherState.location.lat)}&lon=${encodeURIComponent(weatherState.location.lon)}`, {
+    const params = new URLSearchParams({
+      lat: String(weatherState.location.lat),
+      lon: String(weatherState.location.lon),
+      source: weatherState.location.source || 'default',
+    });
+    const response = await fetch(`api/weather.php?${params.toString()}`, {
       headers: { Accept: 'application/json' },
       cache: 'no-store',
     });
@@ -365,7 +426,7 @@ function initMap() {
   weatherState.map = L.map(mapEl, {
     zoomControl: true,
     attributionControl: false,
-  }).setView([58.1504, 7.9470], 9);
+  }).setView([weatherState.location.lat, weatherState.location.lon], 9);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
@@ -508,19 +569,15 @@ function bindReportForm() {
 
   const positionButton = document.querySelector('#use-position-button');
   if (positionButton) {
-    positionButton.addEventListener('click', () => {
-      if (!navigator.geolocation) {
-        showToast('Posisjon støttes ikke i denne nettleseren.');
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition((position) => {
-        document.querySelector('#report-lat').value = String(position.coords.latitude);
-        document.querySelector('#report-lon').value = String(position.coords.longitude);
+    positionButton.addEventListener('click', async () => {
+      try {
+        const position = await getPosition();
+        document.querySelector('#report-lat').value = Number(position.coords.latitude).toFixed(6);
+        document.querySelector('#report-lon').value = Number(position.coords.longitude).toFixed(6);
         showToast('Posisjon lagt til rapporten.');
-      }, () => {
-        showToast('Kunne ikke hente posisjon.');
-      }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+      } catch (error) {
+        showToast(error.message || 'Kunne ikke hente posisjon.');
+      }
     });
   }
 
@@ -583,7 +640,7 @@ function initApp() {
   bindReportForm();
   bindFavorites();
   renderFavorites();
-  loadWeather();
+  loadWeather({ preferUserLocation: true });
   loadReports();
   window.setInterval(updateClock, 30_000);
 }

@@ -55,13 +55,19 @@ function notify(message) {
   }
 }
 
+const SERVICE_WORKER_VERSION = '20260525-reportfilter2';
+
 async function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) {
     notify('Service worker støttes ikke i denne nettleseren.');
     return null;
   }
 
-  return navigator.serviceWorker.register('service-worker.js');
+  const registration = await navigator.serviceWorker.register(`service-worker.js?v=${SERVICE_WORKER_VERSION}`, {
+    updateViaCache: 'none',
+  });
+  registration.update?.();
+  return registration;
 }
 
 async function ensureNotificationPermission() {

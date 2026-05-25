@@ -1,13 +1,14 @@
-const CACHE_NAME = 'vaervakt-2026-v6';
+const CACHE_NAME = 'vaervakt-2026-v7';
+const ASSET_VERSION = '20260525-reportfilter2';
 const PRECACHE_URLS = [
   './',
   './index.html',
   './tailwind.css',
   './styles.css',
   './vendor/leaflet/leaflet.css',
-  './vendor/leaflet/leaflet.js',
-  './app.js',
-  './script.js',
+  `./vendor/leaflet/leaflet.js?v=${ASSET_VERSION}`,
+  `./app.js?v=${ASSET_VERSION}`,
+  `./script.js?v=${ASSET_VERSION}`,
   './manifest.json',
   './icons/vaervakt-icon.svg',
 ];

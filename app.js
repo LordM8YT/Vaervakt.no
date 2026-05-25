@@ -197,9 +197,15 @@ function renderWeatherMeta() {
   const uvIndex = document.querySelector('#uv-index');
   const uvStatus = document.querySelector('#uv-status');
   const favoriteButton = document.querySelector('#favorite-location-button');
+  const weatherPositionButton = document.querySelector('#weather-position-button');
 
   if (uvIndex) uvIndex.textContent = weatherState.uvIndex === null ? '--' : String(weatherState.uvIndex);
   if (uvStatus) uvStatus.textContent = weatherState.uvIndex === null ? 'Henter MET' : getUvStatus(weatherState.uvIndex);
+
+  if (weatherPositionButton) {
+    const note = weatherPositionButton.querySelector('.weather-meta-note');
+    if (note) note.textContent = weatherState.location.name;
+  }
 
   if (favoriteButton) {
     const note = favoriteButton.querySelector('.weather-meta-note');
@@ -502,6 +508,64 @@ function bindFavorites() {
   }
 }
 
+function bindWeatherLocation() {
+  const button = document.querySelector('#weather-position-button');
+  if (!button) return;
+
+  button.addEventListener('click', async () => {
+    await useBrowserLocationForWeather({ prompt: true });
+  });
+}
+
+async function useBrowserLocationForWeather({ prompt = false } = {}) {
+  if (!navigator.geolocation) {
+    if (prompt) showToast('Posisjon støttes ikke i denne nettleseren.');
+    return false;
+  }
+
+  if (!prompt && navigator.permissions?.query) {
+    try {
+      const permission = await navigator.permissions.query({ name: 'geolocation' });
+      if (permission.state !== 'granted') return false;
+    } catch (error) {
+      return false;
+    }
+  } else if (!prompt) {
+    return false;
+  }
+
+  const button = document.querySelector('#weather-position-button');
+  const value = button?.querySelector('.weather-meta-value');
+  const originalText = value?.textContent || '';
+  if (value) value.textContent = 'Henter…';
+  if (button) button.disabled = true;
+
+  try {
+    const position = await requestCurrentPosition({ enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+    weatherState.location = {
+      id: `pos-${position.coords.latitude.toFixed(4)}-${position.coords.longitude.toFixed(4)}`,
+      name: 'Din posisjon',
+      lat: Number(position.coords.latitude.toFixed(6)),
+      lon: Number(position.coords.longitude.toFixed(6)),
+    };
+    await loadWeather();
+    if (prompt) showToast('Varsel oppdatert for din posisjon.');
+    return true;
+  } catch (error) {
+    if (prompt) showToast('Kunne ikke hente posisjon.');
+    return false;
+  } finally {
+    if (button) button.disabled = false;
+    if (value) value.textContent = originalText || 'Bruk min';
+  }
+}
+
+function requestCurrentPosition(options) {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, options);
+  });
+}
+
 function bindReportForm() {
   const form = document.querySelector('#report-form');
   if (!form || form.dataset.vaervaktBound === 'true') return;
@@ -601,10 +665,11 @@ function initApp() {
   renderWeatherMeta();
   renderObservations();
   renderNavigation();
+  bindWeatherLocation();
   bindReportForm();
   bindFavorites();
   renderFavorites();
-  loadWeather();
+  loadWeather().then(() => useBrowserLocationForWeather());
   loadReports();
   window.setInterval(updateClock, 30_000);
 }

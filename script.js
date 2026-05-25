@@ -55,7 +55,37 @@ function notify(message) {
   }
 }
 
-const SERVICE_WORKER_VERSION = '20260525-reportfilter3';
+const SERVICE_WORKER_VERSION = '20260525-autorefresh1';
+const SERVICE_WORKER_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
+let serviceWorkerReloading = false;
+let serviceWorkerReloadListenerBound = false;
+let serviceWorkerUpdateTimer = null;
+
+function reloadWhenServiceWorkerTakesControl() {
+  if (!('serviceWorker' in navigator) || serviceWorkerReloadListenerBound) return;
+  serviceWorkerReloadListenerBound = true;
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (serviceWorkerReloading) return;
+    serviceWorkerReloading = true;
+    notify('Værvakt er oppdatert. Laster inn ny versjon…');
+    window.setTimeout(() => window.location.reload(), 250);
+  });
+}
+
+function startServiceWorkerUpdateChecks(registration) {
+  if (!registration || serviceWorkerUpdateTimer) return;
+
+  const checkForUpdate = () => registration.update?.().catch((error) => {
+    console.warn('Kunne ikke sjekke service worker-oppdatering:', error);
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') checkForUpdate();
+  });
+
+  serviceWorkerUpdateTimer = window.setInterval(checkForUpdate, SERVICE_WORKER_UPDATE_INTERVAL_MS);
+}
 
 async function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) {
@@ -63,10 +93,13 @@ async function registerServiceWorker() {
     return null;
   }
 
+  reloadWhenServiceWorkerTakesControl();
+
   const registration = await navigator.serviceWorker.register(`service-worker.js?v=${SERVICE_WORKER_VERSION}`, {
     updateViaCache: 'none',
   });
-  registration.update?.();
+  await registration.update?.();
+  startServiceWorkerUpdateChecks(registration);
   return registration;
 }
 

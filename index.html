@@ -20,6 +20,7 @@
         <section aria-labelledby="current-weather-title" class="pt-2">
           <div class="mb-6">
             <p id="current-weather-title" class="vv-text text-base font-bold">Kristiansand, NO</p>
+            <p id="location-source" class="vv-muted mt-1 text-sm">Standarddata fra Kristiansand. Del posisjon eller søk etter sted.</p>
             <p id="clock" class="vv-muted mt-1 text-sm">--:--</p>
           </div>
 
@@ -50,6 +51,12 @@
               <span class="weather-meta-note">Oppdater varsel</span>
             </button>
           </div>
+          <form id="location-search-form" class="location-search mt-4" role="search">
+            <label class="sr-only" for="location-search-input">Søk etter sted</label>
+            <input id="location-search-input" class="form-field" autocomplete="address-level2" maxlength="80" placeholder="Søk sted, f.eks. Bergen eller Tromsø">
+            <button class="primary-button" type="submit">Søk</button>
+          </form>
+          <p id="location-search-status" class="vv-muted mt-2 text-xs">Søk eller del posisjon for lokale MET-data og rapporter.</p>
         </section>
 
         <div class="vv-divider" role="presentation"></div>

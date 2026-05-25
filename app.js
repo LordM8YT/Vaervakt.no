@@ -4,6 +4,7 @@ const weatherState = {
     name: 'Kristiansand, NO',
     lat: 58.1504,
     lon: 7.9470,
+    source: 'default',
   },
   current: {
     temperature: 21,
@@ -183,14 +184,22 @@ function getForecastWidthClass(width) {
 
 function renderCurrentWeather() {
   const title = document.querySelector('#current-weather-title');
+  const source = document.querySelector('#location-source');
   const temperature = document.querySelector('#temperature');
   const feelsLike = document.querySelector('#feels-like');
   const condition = document.querySelector('#weather-condition');
 
   if (title) title.textContent = weatherState.location.name;
+  if (source) source.textContent = getLocationSourceText();
   if (temperature) temperature.textContent = String(Math.round(Number(weatherState.current?.temperature ?? 0)));
   if (feelsLike) feelsLike.textContent = `${Math.round(Number(weatherState.current?.feelsLike ?? weatherState.current?.temperature ?? 0))}°C`;
   if (condition) condition.textContent = weatherState.current?.condition || '';
+}
+
+function getLocationSourceText() {
+  if (weatherState.location.source === 'user') return 'Data fra posisjonen du har delt.';
+  if (weatherState.location.source === 'search') return `Data fra søket sted: ${weatherState.location.name}.`;
+  return 'Standarddata fra Kristiansand, NO. Del posisjon eller søk etter sted for lokalt varsel.';
 }
 
 function renderWeatherMeta() {
@@ -229,7 +238,14 @@ async function loadWeather() {
       throw new Error(payload.message || 'Kunne ikke hente værdata fra MET');
     }
 
-    weatherState.location = payload.location || weatherState.location;
+    const previousLocation = weatherState.location;
+    weatherState.location = {
+      ...previousLocation,
+      ...(payload.location || {}),
+      id: previousLocation.id,
+      name: previousLocation.name,
+      source: previousLocation.source,
+    };
     weatherState.current = payload.current || weatherState.current;
     weatherState.uvIndex = Number(payload.current?.uvIndex ?? 0);
     weatherState.rain = Array.isArray(payload.rain) ? payload.rain : weatherState.rain;
@@ -278,7 +294,14 @@ function createObservationElement(item) {
 
 async function loadReports() {
   try {
-    const response = await fetch('api/reports.php?limit=20', {
+    const params = new URLSearchParams({ limit: '20' });
+    if (weatherState.location.source !== 'default') {
+      params.set('lat', String(weatherState.location.lat));
+      params.set('lon', String(weatherState.location.lon));
+      params.set('radiusKm', '25');
+    }
+
+    const response = await fetch(`api/reports.php?${params.toString()}`, {
       headers: { Accept: 'application/json' },
       cache: 'no-store',
     });
@@ -289,7 +312,7 @@ async function loadReports() {
 
     weatherState.observations = payload.reports.length
       ? payload.reports
-      : [{ icon: '🌤️', time: 'Ingen data', reporter: 'Ingen observasjoner ennå', condition: 'Send den første rapporten', temp: 0 }];
+      : [{ icon: '🌤️', time: 'Ingen data', reporter: payload.filtered ? `Ingen rapporter nær ${weatherState.location.name}` : 'Ingen observasjoner ennå', condition: payload.filtered ? 'Utvid søket eller send første lokale rapport' : 'Send den første rapporten', temp: 0 }];
   } catch (error) {
     console.warn('Kunne ikke hente DB-observasjoner:', error);
     weatherState.observations = [{ icon: '⚠️', time: 'API utilgjengelig', reporter: 'Kunne ikke hente observasjoner', condition: 'Sjekk DB/API-oppsett', temp: 0 }];
@@ -508,6 +531,67 @@ function bindFavorites() {
   }
 }
 
+function bindLocationSearch() {
+  const form = document.querySelector('#location-search-form');
+  const input = document.querySelector('#location-search-input');
+  const status = document.querySelector('#location-search-status');
+  if (!form || !input) return;
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const query = input.value.trim();
+    if (query.length < 2) {
+      showToast('Skriv minst to tegn for å søke etter sted.');
+      return;
+    }
+
+    const button = form.querySelector('button[type="submit"]');
+    const originalText = button?.textContent || '';
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Søker…';
+    }
+    if (status) status.textContent = `Søker etter ${query}...`;
+
+    try {
+      const response = await fetch(`api/geocode.php?q=${encodeURIComponent(query)}`, {
+        headers: { Accept: 'application/json' },
+        cache: 'force-cache',
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.success || !Array.isArray(payload.results) || !payload.results.length) {
+        throw new Error(payload.message || 'Fant ikke stedet.');
+      }
+
+      await setActiveLocation({ ...payload.results[0], source: 'search' });
+      if (status) status.textContent = `Viser MET-data og rapporter nær ${weatherState.location.name}.`;
+      showToast(`Viser vær for ${weatherState.location.name}.`);
+    } catch (error) {
+      if (status) status.textContent = 'Fant ikke stedet. Prøv et mer presist stedsnavn.';
+      showToast(error.message || 'Kunne ikke søke etter sted.');
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalText || 'Søk';
+      }
+    }
+  });
+}
+
+async function setActiveLocation(location) {
+  weatherState.location = {
+    id: location.id || `loc-${Number(location.lat).toFixed(4)}-${Number(location.lon).toFixed(4)}`,
+    name: location.name || 'Valgt sted',
+    lat: Number(Number(location.lat).toFixed(6)),
+    lon: Number(Number(location.lon).toFixed(6)),
+    source: location.source || 'search',
+  };
+  renderCurrentWeather();
+  renderWeatherMeta();
+  await loadWeather();
+  await loadReports();
+}
+
 function bindWeatherLocation() {
   const button = document.querySelector('#weather-position-button');
   if (!button) return;
@@ -542,13 +626,13 @@ async function useBrowserLocationForWeather({ prompt = false } = {}) {
 
   try {
     const position = await requestCurrentPosition({ enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
-    weatherState.location = {
+    await setActiveLocation({
       id: `pos-${position.coords.latitude.toFixed(4)}-${position.coords.longitude.toFixed(4)}`,
       name: 'Din posisjon',
       lat: Number(position.coords.latitude.toFixed(6)),
       lon: Number(position.coords.longitude.toFixed(6)),
-    };
-    await loadWeather();
+      source: 'user',
+    });
     if (prompt) showToast('Varsel oppdatert for din posisjon.');
     return true;
   } catch (error) {
@@ -665,6 +749,7 @@ function initApp() {
   renderWeatherMeta();
   renderObservations();
   renderNavigation();
+  bindLocationSearch();
   bindWeatherLocation();
   bindReportForm();
   bindFavorites();

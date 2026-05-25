@@ -299,6 +299,9 @@ async function loadReports() {
       params.set('lat', String(weatherState.location.lat));
       params.set('lon', String(weatherState.location.lon));
       params.set('radiusKm', '25');
+      if (weatherState.location.source === 'search') {
+        params.set('location', weatherState.location.searchQuery || weatherState.location.name);
+      }
     }
 
     const response = await fetch(`api/reports.php?${params.toString()}`, {
@@ -563,7 +566,7 @@ function bindLocationSearch() {
         throw new Error(payload.message || 'Fant ikke stedet.');
       }
 
-      await setActiveLocation({ ...payload.results[0], source: 'search' });
+      await setActiveLocation({ ...payload.results[0], source: 'search', searchQuery: query });
       if (status) status.textContent = `Viser MET-data og rapporter nær ${weatherState.location.name}.`;
       showToast(`Viser vær for ${weatherState.location.name}.`);
     } catch (error) {
@@ -585,6 +588,7 @@ async function setActiveLocation(location) {
     lat: Number(Number(location.lat).toFixed(6)),
     lon: Number(Number(location.lon).toFixed(6)),
     source: location.source || 'search',
+    searchQuery: location.searchQuery || '',
   };
   renderCurrentWeather();
   renderWeatherMeta();

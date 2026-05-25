@@ -49,11 +49,49 @@ function vv_relative_time(?string $timestamp): string
     return $created->format('d.m H:i');
 }
 
+function vv_location_terms(string $location): array
+{
+    $normalized = function_exists('mb_strtolower') ? mb_strtolower($location, 'UTF-8') : strtolower($location);
+    $parts = preg_split('/[^\p{L}\p{N}]+/u', $normalized) ?: [];
+    $terms = [];
+    foreach ($parts as $part) {
+        $part = trim($part);
+        if (strlen($part) < 3 || in_array($part, ['norge', 'norway'], true)) continue;
+        $terms[$part] = true;
+        if (count($terms) >= 4) break;
+    }
+    return array_keys($terms);
+}
+
+function vv_report_filter(array $cols, bool $hasLocationFilter, ?float $lat, ?float $lon, float $radiusKm, array $terms): array
+{
+    $clauses = [];
+    $params = [];
+    if ($hasLocationFilter && in_array('latitude', $cols, true) && in_array('longitude', $cols, true)) {
+        $clauses[] = '(latitude IS NOT NULL AND longitude IS NOT NULL AND (6371 * ACOS(GREATEST(-1, LEAST(1, COS(RADIANS(?)) * COS(RADIANS(latitude)) * COS(RADIANS(longitude) - RADIANS(?)) + SIN(RADIANS(?)) * SIN(RADIANS(latitude)))))) <= ?)';
+        array_push($params, $lat, $lon, $lat, $radiusKm);
+    }
+
+    if ($terms !== []) {
+        $textClauses = [];
+        foreach ($terms as $term) {
+            $textClauses[] = 'LOWER(location) LIKE ?';
+            $params[] = '%' . $term . '%';
+        }
+        $clauses[] = '(' . implode(' OR ', $textClauses) . ')';
+    }
+
+    if ($clauses === []) return ['', [], false];
+    return [' WHERE ' . implode(' OR ', $clauses), $params, true];
+}
+
 try {
     $limit = max(1, min(50, (int) ($_GET['limit'] ?? 15)));
     $filterLat = filter_var($_GET['lat'] ?? null, FILTER_VALIDATE_FLOAT, FILTER_NULL_ON_FAILURE);
     $filterLon = filter_var($_GET['lon'] ?? null, FILTER_VALIDATE_FLOAT, FILTER_NULL_ON_FAILURE);
     $radiusKm = max(1, min(100, (float) ($_GET['radiusKm'] ?? 25)));
+    $locationQuery = trim((string) ($_GET['location'] ?? $_GET['q'] ?? ''));
+    $locationTerms = vv_location_terms($locationQuery);
     $hasLocationFilter = $filterLat !== null && $filterLon !== null && $filterLat >= -90 && $filterLat <= 90 && $filterLon >= -180 && $filterLon <= 180;
     $rows = [];
     $table = null;
@@ -65,13 +103,7 @@ try {
         $select = ['username', 'weather_condition', 'location', 'temperature', 'created_at'];
         if (in_array('latitude', $cols, true)) $select[] = 'latitude';
         if (in_array('longitude', $cols, true)) $select[] = 'longitude';
-        $where = '';
-        $params = [];
-        if ($hasLocationFilter && in_array('latitude', $cols, true) && in_array('longitude', $cols, true)) {
-            $filtered = true;
-            $where = ' WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND (6371 * ACOS(GREATEST(-1, LEAST(1, COS(RADIANS(?)) * COS(RADIANS(latitude)) * COS(RADIANS(longitude) - RADIANS(?)) + SIN(RADIANS(?)) * SIN(RADIANS(latitude)))))) <= ?';
-            $params = [$filterLat, $filterLon, $filterLat, $radiusKm];
-        }
+        [$where, $params, $filtered] = vv_report_filter($cols, $hasLocationFilter, $filterLat, $filterLon, $radiusKm, $locationTerms);
         $sql = 'SELECT ' . implode(', ', $select) . ' FROM weather_reports' . $where . ' ORDER BY created_at DESC LIMIT ' . $limit;
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
@@ -82,13 +114,7 @@ try {
         $select = ['reporter_name AS username', 'conditions AS weather_condition', 'location', 'temperature_c AS temperature', 'created_at'];
         if (in_array('latitude', $cols, true)) $select[] = 'latitude';
         if (in_array('longitude', $cols, true)) $select[] = 'longitude';
-        $where = '';
-        $params = [];
-        if ($hasLocationFilter && in_array('latitude', $cols, true) && in_array('longitude', $cols, true)) {
-            $filtered = true;
-            $where = ' WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND (6371 * ACOS(GREATEST(-1, LEAST(1, COS(RADIANS(?)) * COS(RADIANS(latitude)) * COS(RADIANS(longitude) - RADIANS(?)) + SIN(RADIANS(?)) * SIN(RADIANS(latitude)))))) <= ?';
-            $params = [$filterLat, $filterLon, $filterLat, $radiusKm];
-        }
+        [$where, $params, $filtered] = vv_report_filter($cols, $hasLocationFilter, $filterLat, $filterLon, $radiusKm, $locationTerms);
         $sql = 'SELECT ' . implode(', ', $select) . ' FROM reports' . $where . ' ORDER BY created_at DESC LIMIT ' . $limit;
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
@@ -116,6 +142,7 @@ try {
         'source' => $table,
         'filtered' => $filtered,
         'radiusKm' => $filtered ? $radiusKm : null,
+        'locationTerms' => $filtered ? $locationTerms : [],
         'reports' => $reports,
     ], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $error) {

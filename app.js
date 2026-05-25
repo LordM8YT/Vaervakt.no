@@ -53,6 +53,18 @@ const navItems = [
 ];
 
 const favoritesStorageKey = 'vaervakt_favorites';
+let weatherRequestSequence = 0;
+let reportsRequestSequence = 0;
+
+function getActiveLocationKey() {
+  return [
+    weatherState.location.id,
+    weatherState.location.source,
+    weatherState.location.searchQuery || '',
+    Number(weatherState.location.lat).toFixed(5),
+    Number(weatherState.location.lon).toFixed(5),
+  ].join('|');
+}
 
 function updateClock() {
   const clock = document.querySelector('#clock');
@@ -228,14 +240,23 @@ function renderWeatherMeta() {
 }
 
 async function loadWeather() {
+  const requestId = ++weatherRequestSequence;
+  const locationKey = getActiveLocationKey();
+  const lat = weatherState.location.lat;
+  const lon = weatherState.location.lon;
+
   try {
-    const response = await fetch(`api/weather.php?lat=${encodeURIComponent(weatherState.location.lat)}&lon=${encodeURIComponent(weatherState.location.lon)}`, {
+    const response = await fetch(`api/weather.php?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`, {
       headers: { Accept: 'application/json' },
       cache: 'no-store',
     });
     const payload = await response.json();
     if (!response.ok || !payload.success) {
       throw new Error(payload.message || 'Kunne ikke hente værdata fra MET');
+    }
+
+    if (requestId !== weatherRequestSequence || locationKey !== getActiveLocationKey()) {
+      return;
     }
 
     const previousLocation = weatherState.location;
@@ -252,6 +273,9 @@ async function loadWeather() {
     weatherState.temperature = Array.isArray(payload.temperature) ? payload.temperature : weatherState.temperature;
     weatherState.forecast = Array.isArray(payload.forecast) && payload.forecast.length ? payload.forecast : weatherState.forecast;
   } catch (error) {
+    if (requestId !== weatherRequestSequence || locationKey !== getActiveLocationKey()) {
+      return;
+    }
     console.warn('Kunne ikke hente MET-værdata:', error);
     showToast('Kunne ikke hente værdata fra MET akkurat nå.');
   }
@@ -293,6 +317,9 @@ function createObservationElement(item) {
 }
 
 async function loadReports() {
+  const requestId = ++reportsRequestSequence;
+  const locationKey = getActiveLocationKey();
+
   try {
     const params = new URLSearchParams({ limit: '20' });
     if (weatherState.location.source !== 'default') {
@@ -313,12 +340,23 @@ async function loadReports() {
       throw new Error(payload.message || 'Kunne ikke hente rapporter');
     }
 
+    if (requestId !== reportsRequestSequence || locationKey !== getActiveLocationKey()) {
+      return;
+    }
+
     weatherState.observations = payload.reports.length
       ? payload.reports
       : [{ icon: '🌤️', time: 'Ingen data', reporter: payload.filtered ? `Ingen rapporter nær ${weatherState.location.name}` : 'Ingen observasjoner ennå', condition: payload.filtered ? 'Utvid søket eller send første lokale rapport' : 'Send den første rapporten', temp: 0 }];
   } catch (error) {
+    if (requestId !== reportsRequestSequence || locationKey !== getActiveLocationKey()) {
+      return;
+    }
     console.warn('Kunne ikke hente DB-observasjoner:', error);
     weatherState.observations = [{ icon: '⚠️', time: 'API utilgjengelig', reporter: 'Kunne ikke hente observasjoner', condition: 'Sjekk DB/API-oppsett', temp: 0 }];
+  }
+
+  if (requestId !== reportsRequestSequence || locationKey !== getActiveLocationKey()) {
+    return;
   }
 
   renderObservations();
@@ -592,8 +630,7 @@ async function setActiveLocation(location) {
   };
   renderCurrentWeather();
   renderWeatherMeta();
-  await loadWeather();
-  await loadReports();
+  await Promise.all([loadWeather(), loadReports()]);
 }
 
 function bindWeatherLocation() {

@@ -55,7 +55,7 @@ function notify(message) {
   }
 }
 
-const SERVICE_WORKER_VERSION = '20260525-autorefresh1';
+const SERVICE_WORKER_VERSION = '20260525-reports1';
 const SERVICE_WORKER_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
 let serviceWorkerReloading = false;
 let serviceWorkerReloadListenerBound = false;

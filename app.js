@@ -322,13 +322,11 @@ async function loadReports() {
 
   try {
     const params = new URLSearchParams({ limit: '20' });
-    if (weatherState.location.source !== 'default') {
+    if (weatherState.location.source === 'search') {
       params.set('lat', String(weatherState.location.lat));
       params.set('lon', String(weatherState.location.lon));
       params.set('radiusKm', '25');
-      if (weatherState.location.source === 'search') {
-        params.set('location', weatherState.location.searchQuery || weatherState.location.name);
-      }
+      params.set('location', weatherState.location.searchQuery || weatherState.location.name);
     }
 
     const response = await fetch(`api/reports.php?${params.toString()}`, {
@@ -722,6 +720,10 @@ function bindReportForm() {
     if (isSubmitting) return;
 
     const data = Object.fromEntries(new FormData(form).entries());
+    if (!data.lat && !data.lon && weatherState.location.source === 'user') {
+      data.lat = String(weatherState.location.lat);
+      data.lon = String(weatherState.location.lon);
+    }
     isSubmitting = true;
     form.setAttribute('aria-busy', 'true');
     if (submitButton) {

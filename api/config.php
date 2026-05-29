@@ -11,6 +11,9 @@ $payload = [
     'vapidPublicKey' => VAPID_PUBLIC,
     'pushReady' => VAPID_PUBLIC !== '',
     'subscriptionEndpoint' => 'api/subscription.php',
+    'supportUrl' => SUPPORT_URL,
+    'supportLabel' => SUPPORT_LABEL,
+    'supportReady' => SUPPORT_URL !== '',
     'diagnostics' => [
         'envFileLoaded' => VAERVAKT_ENV_FIL_LASTET,
         'dbConfigured' => DB_HOST !== '' && DB_NAME !== '' && DB_USER !== '',

@@ -322,11 +322,16 @@ async function loadReports() {
 
   try {
     const params = new URLSearchParams({ limit: '20' });
-    if (weatherState.location.source === 'search') {
+    const hasCoords = Number.isFinite(Number(weatherState.location.lat)) && Number.isFinite(Number(weatherState.location.lon));
+    if (hasCoords) {
       params.set('lat', String(weatherState.location.lat));
       params.set('lon', String(weatherState.location.lon));
-      params.set('radiusKm', '25');
+      params.set('radiusKm', weatherState.location.source === 'user' ? '15' : '25');
+    }
+    if (weatherState.location.source === 'search') {
       params.set('location', weatherState.location.searchQuery || weatherState.location.name);
+    } else if (weatherState.location.source === 'default') {
+      params.set('location', weatherState.location.name);
     }
 
     const response = await fetch(`api/reports.php?${params.toString()}`, {
@@ -429,11 +434,14 @@ function isViewVisible(viewName) {
 function initMap() {
   const mapEl = document.querySelector('#leaflet-map');
   if (!mapEl || weatherState.map || typeof L === 'undefined') return;
+  const initialLat = Number.isFinite(Number(weatherState.location.lat)) ? Number(weatherState.location.lat) : 58.1504;
+  const initialLon = Number.isFinite(Number(weatherState.location.lon)) ? Number(weatherState.location.lon) : 7.9470;
+  const initialZoom = weatherState.location.source === 'user' ? 11 : 9;
 
   weatherState.map = L.map(mapEl, {
     zoomControl: true,
     attributionControl: false,
-  }).setView([58.1504, 7.9470], 9);
+  }).setView([initialLat, initialLon], initialZoom);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
@@ -465,8 +473,14 @@ function renderMapMarkers() {
 
   const located = weatherState.observations.filter((item) => Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lon)));
   if (!located.length) {
-    weatherState.map.setView([58.1504, 7.9470], 9);
-    if (status) status.textContent = 'Ingen rapporter med koordinater ennå. Listen under viser DB-observasjoner uten kartpunkt.';
+    const fallbackLat = Number.isFinite(Number(weatherState.location.lat)) ? Number(weatherState.location.lat) : 58.1504;
+    const fallbackLon = Number.isFinite(Number(weatherState.location.lon)) ? Number(weatherState.location.lon) : 7.9470;
+    weatherState.map.setView([fallbackLat, fallbackLon], weatherState.location.source === 'user' ? 11 : 9);
+    if (status) {
+      status.textContent = weatherState.location.source === 'user' || weatherState.location.source === 'search'
+        ? `Ingen rapporter med koordinater nær ${weatherState.location.name} ennå.`
+        : 'Ingen rapporter med koordinater ennå. Listen under viser lokale observasjoner uten kartpunkt.';
+    }
     window.setTimeout(() => weatherState.map.invalidateSize(), 80);
     return;
   }
@@ -783,7 +797,7 @@ function showToast(message, timeout = 3200) {
   window.setTimeout(() => toast.remove(), timeout);
 }
 
-function initApp() {
+async function initApp() {
   updateClock();
   renderCurrentWeather();
   drawRainChart();
@@ -797,10 +811,18 @@ function initApp() {
   bindReportForm();
   bindFavorites();
   renderFavorites();
-  loadWeather().then(() => useBrowserLocationForWeather());
-  loadReports();
+  await loadWeather();
+  const usedPosition = await useBrowserLocationForWeather();
+  if (!usedPosition) {
+    await loadReports();
+  }
   window.setInterval(updateClock, 30_000);
 }
 
 window.VaervaktApp = { showToast };
-document.addEventListener('DOMContentLoaded', initApp);
+document.addEventListener('DOMContentLoaded', () => {
+  initApp().catch((error) => {
+    console.error('Kunne ikke starte Værvakt:', error);
+    showToast('Kunne ikke starte appen helt riktig.');
+  });
+});

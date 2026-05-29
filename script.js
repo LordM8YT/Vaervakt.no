@@ -4,6 +4,8 @@ const pushConfig = {
     document.querySelector('meta[name="vapid-public-key"]')?.content ||
     '',
   subscriptionEndpoint: window.VAERVAKT_CONFIG?.subscriptionEndpoint || '',
+  supportUrl: window.VAERVAKT_CONFIG?.supportUrl || '',
+  supportLabel: window.VAERVAKT_CONFIG?.supportLabel || 'Støtt med Vipps',
 };
 
 let pushRegistrationPromise = null;
@@ -26,8 +28,18 @@ async function loadPushConfig() {
     if (payload.subscriptionEndpoint) {
       pushConfig.subscriptionEndpoint = payload.subscriptionEndpoint;
     }
+    if (payload.supportUrl) {
+      pushConfig.supportUrl = payload.supportUrl;
+    }
+    if (payload.supportLabel) {
+      pushConfig.supportLabel = payload.supportLabel;
+    }
+    syncSupportCard();
     return pushConfig;
-  }).catch(() => pushConfig);
+  }).catch(() => {
+    syncSupportCard();
+    return pushConfig;
+  });
 
   return pushConfigPromise;
 }
@@ -52,6 +64,25 @@ function urlBase64ToUint8Array(base64String) {
 function notify(message) {
   if (window.VaervaktApp?.showToast) {
     window.VaervaktApp.showToast(message);
+  }
+}
+
+function syncSupportCard() {
+  const section = document.querySelector('#support-section');
+  const link = document.querySelector('#support-link');
+  const badge = document.querySelector('#support-status');
+  const copy = document.querySelector('#support-copy');
+  if (!section || !link || !badge || !copy) return;
+
+  const ready = String(pushConfig.supportUrl || '').trim() !== '';
+  badge.textContent = ready ? 'Vipps klar' : 'Vipps snart';
+  copy.textContent = ready
+    ? 'Bidrag hjelper oss med drift, varsler og bedre lokal værdekning uten å fylle appen med reklame.'
+    : 'Vipps-lenken er snart klar. Når den er aktiv dukker støtteknappen opp her automatisk.';
+  link.hidden = !ready;
+  if (ready) {
+    link.href = pushConfig.supportUrl;
+    link.textContent = pushConfig.supportLabel || 'Støtt med Vipps';
   }
 }
 
@@ -196,6 +227,7 @@ function addPushButton() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  syncSupportCard();
   registerServiceWorker();
   loadPushConfig();
   addPushButton();

@@ -173,7 +173,7 @@ $config['vapid_private'] = VAPID_PRIVATE;
 $config['vapid_subject'] = VAPID_SUBJECT;
 
 /** Valgfri støtte-lenke, f.eks. Vipps/Ko-fi/Stripe Checkout */
-define('SUPPORT_URL', vaervakt_env('SUPPORT_URL') ?? '');
+define('SUPPORT_URL', vaervakt_env('SUPPORT_URL') ?? 'https://betal.vipps.no/opy01u');
 define('SUPPORT_LABEL', vaervakt_env('SUPPORT_LABEL') ?? 'Støtt med Vipps');
 $config['support_url'] = SUPPORT_URL;
 $config['support_label'] = SUPPORT_LABEL;

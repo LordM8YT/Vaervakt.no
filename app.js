@@ -797,8 +797,28 @@ function showToast(message, timeout = 3200) {
   window.setTimeout(() => toast.remove(), timeout);
 }
 
+function trackVisit() {
+  const payload = JSON.stringify({
+    path: window.location.pathname || '/',
+    at: new Date().toISOString(),
+  });
+
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon('api/visit.php', new Blob([payload], { type: 'application/json' }));
+    return;
+  }
+
+  fetch('api/visit.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: payload,
+    keepalive: true,
+  }).catch(() => {});
+}
+
 async function initApp() {
   updateClock();
+  trackVisit();
   renderCurrentWeather();
   drawRainChart();
   drawTemperatureChart();

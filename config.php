@@ -178,4 +178,10 @@ define('SUPPORT_LABEL', vaervakt_env('SUPPORT_LABEL') ?? 'Støtt med Vipps');
 $config['support_url'] = SUPPORT_URL;
 $config['support_label'] = SUPPORT_LABEL;
 
+/** Admin-dashboard. Hvis ADMIN_PASSWORD mangler brukes DB_PASS som serverlokal fallback. */
+define('ADMIN_USERNAME', vaervakt_env('ADMIN_USERNAME') ?? 'admin');
+define('ADMIN_PASSWORD', vaervakt_env('ADMIN_PASSWORD') ?? DB_PASS);
+define('ADMIN_PASSWORD_HASH', vaervakt_env('ADMIN_PASSWORD_HASH') ?? '');
+$config['admin_username'] = ADMIN_USERNAME;
+
 unset($envPath);

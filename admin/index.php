@@ -5,6 +5,9 @@ require_once __DIR__ . '/../config.php';
 
 header('X-Robots-Tag: noindex, nofollow, noarchive');
 header('Cache-Control: no-store, private');
+header('Referrer-Policy: no-referrer');
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
 
 function vv_admin_h($value): string
 {
@@ -122,7 +125,7 @@ if (empty($_SESSION['admin_authed'])) {
         $body .= '<p class="error">' . vv_admin_h($loginError) . '</p>';
     }
     $body .= '<form method="post" autocomplete="off"><input type="hidden" name="csrf" value="' . vv_admin_h($_SESSION['csrf']) . '">';
-    $body .= '<label for="username">Brukernavn</label><input id="username" name="username" value="' . vv_admin_h(ADMIN_USERNAME) . '" required>';
+    $body .= '<label for="username">Brukernavn</label><input id="username" name="username" autocomplete="username" required>';
     $body .= '<label for="password">Passord</label><input id="password" name="password" type="password" required>';
     $body .= '<button class="button button-primary" type="submit"' . ($disabled ? ' disabled' : '') . '>Åpne dashboard</button></form></section></main>';
     vv_admin_render_shell('Logg inn', $body, true);

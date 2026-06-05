@@ -86,7 +86,7 @@ function syncSupportCard() {
   }
 }
 
-const SERVICE_WORKER_VERSION = '20260601-admin1';
+const SERVICE_WORKER_VERSION = '20260605-admin2';
 const SERVICE_WORKER_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
 let serviceWorkerReloading = false;
 let serviceWorkerReloadListenerBound = false;
@@ -226,8 +226,30 @@ function addPushButton() {
   }));
 }
 
+function trackVisit() {
+  if (window.location.pathname.startsWith('/admin')) return;
+
+  const payload = JSON.stringify({
+    path: window.location.pathname || '/',
+  });
+
+  if (navigator.sendBeacon) {
+    const blob = new Blob([payload], { type: 'application/json' });
+    navigator.sendBeacon('api/visit.php', blob);
+    return;
+  }
+
+  fetch('api/visit.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: payload,
+    keepalive: true,
+  }).catch(() => {});
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   syncSupportCard();
+  trackVisit();
   registerServiceWorker();
   loadPushConfig();
   addPushButton();

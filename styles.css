@@ -173,6 +173,64 @@ html {
   margin-top: 0.25rem;
 }
 
+.weather-summary-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.5rem;
+  padding: 1rem;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(119, 200, 255, 0.2), transparent 34%),
+    rgba(255, 255, 255, 0.05);
+}
+
+.weather-hero-icon {
+  flex: 0 0 auto;
+  filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.26));
+  font-size: clamp(2.4rem, 12vw, 4.25rem);
+  line-height: 1;
+}
+
+.weather-insights-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.weather-insight-card {
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 1.15rem;
+  padding: 0.85rem;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.weather-insight-label,
+.weather-insight-note {
+  display: block;
+  color: var(--vv-text-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.weather-insight-label {
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.weather-insight-value {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--vv-text);
+  font-size: clamp(1rem, 4vw, 1.28rem);
+  line-height: 1.1;
+}
+
+.weather-insight-note {
+  margin-top: 0.25rem;
+}
+
 .vv-divider {
   height: 1px;
   background: rgba(255, 255, 255, 0.07);
@@ -184,6 +242,60 @@ html {
 
 .chart-panel--short {
   height: 8rem;
+}
+
+.hourly-strip {
+  display: flex;
+  gap: 0.75rem;
+  margin-inline: -1.25rem;
+  overflow-x: auto;
+  padding: 0 1.25rem 0.35rem;
+  scroll-padding-inline: 1.25rem;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.hourly-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.hourly-card {
+  display: grid;
+  min-width: 5.6rem;
+  scroll-snap-align: start;
+  gap: 0.35rem;
+  justify-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 1.35rem;
+  padding: 0.95rem 0.7rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.035));
+}
+
+.hourly-time,
+.hourly-meta,
+.hourly-wind {
+  color: var(--vv-text-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.hourly-time {
+  color: var(--vv-text-soft);
+}
+
+.hourly-icon {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.hourly-temp {
+  color: var(--vv-text);
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.hourly-wind {
+  font-weight: 700;
 }
 
 .chart-grid-line {
@@ -406,6 +518,86 @@ html {
   text-transform: uppercase;
 }
 
+.bathing-card {
+  background:
+    radial-gradient(circle at 90% 0%, rgba(45, 212, 191, 0.2), transparent 34%),
+    linear-gradient(180deg, rgba(15, 22, 37, 0.86), rgba(7, 16, 29, 0.78));
+}
+
+.bathing-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.bathing-emoji {
+  font-size: clamp(2.8rem, 14vw, 4.8rem);
+  filter: drop-shadow(0 16px 30px rgba(20, 184, 166, 0.18));
+  line-height: 1;
+}
+
+.bathing-score-wrap {
+  display: grid;
+  align-items: center;
+  gap: 0.8rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.bathing-score-track {
+  height: 0.7rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.bathing-score-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #38bdf8, #5eead4, #fde68a);
+  transition: width 0.45s ease;
+}
+
+.bathing-score {
+  color: var(--vv-text);
+  font-size: 1.1rem;
+}
+
+.bathing-metrics {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.bathing-metric {
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 1rem;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.bathing-metric span,
+.bathing-metric strong {
+  display: block;
+}
+
+.bathing-metric span {
+  color: var(--vv-text-muted);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.bathing-metric strong {
+  margin-top: 0.2rem;
+  color: var(--vv-text);
+  font-size: 0.95rem;
+  line-height: 1.1;
+}
+
 .vv-btn-ghost {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 1rem;
@@ -445,8 +637,13 @@ html {
 
 @media (max-width: 420px) {
   .weather-meta-grid,
+  .weather-insights-grid,
   .location-search {
     grid-template-columns: 1fr;
+  }
+
+  .bathing-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

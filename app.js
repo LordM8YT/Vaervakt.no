@@ -10,7 +10,19 @@ const weatherState = {
     temperature: 21,
     feelsLike: 21,
     condition: 'Henter MET-data',
+    icon: '🌤️',
+    windSpeed: 0,
+    humidity: 0,
   },
+  summary: {
+    headline: 'Rolig værbilde',
+    detail: 'Værvakt kombinerer MET-varsel med lokale rapporter når de finnes.',
+  },
+  insights: [
+    { label: 'Vind', value: '--', note: 'Henter' },
+    { label: 'Luft', value: '--', note: 'Fuktighet' },
+    { label: 'Regn', value: '--', note: 'Neste 6 timer' },
+  ],
   uvIndex: null,
   rain: [
     { hour: '16:00', amount: 0, probability: 0 },
@@ -37,6 +49,22 @@ const weatherState = {
     { day: 'ONS', icon: '☀️', temp: 20, width: 75 },
     { day: 'TOR', icon: '⛅', temp: 16, width: 65 },
   ],
+  hourly: [
+    { hour: 'Nå', icon: '🌤️', condition: 'Henter', temp: 21, precipitation: 0, probability: 0, windSpeed: 0 },
+  ],
+  bathing: {
+    score: 0,
+    label: 'Henter badevær',
+    emoji: '🌊',
+    description: 'Vi sjekker luft, vind og nedbør før vi gir badevær-vurdering.',
+    airTemperature: 0,
+    windSpeed: 0,
+    rainAmount: 0,
+    rainProbability: 0,
+    uvIndex: 0,
+    waterTemperature: null,
+    source: 'Beregnes fra MET-varsel.',
+  },
   observations: [
     { icon: '⏳', time: 'Laster', reporter: 'Henter observasjoner', condition: 'Kobler til databasen', temp: 0 },
   ],
@@ -239,6 +267,132 @@ function renderWeatherMeta() {
   }
 }
 
+function renderWeatherSummary() {
+  const headline = document.querySelector('#weather-summary-headline');
+  const detail = document.querySelector('#weather-summary-detail');
+  const icon = document.querySelector('#weather-hero-icon');
+
+  if (headline) headline.textContent = weatherState.summary?.headline || weatherState.current?.condition || 'Værstatus';
+  if (detail) detail.textContent = weatherState.summary?.detail || 'Lokalt MET-varsel kombinert med rapporter fra folk på bakken.';
+  if (icon) icon.textContent = weatherState.current?.icon || '🌤️';
+}
+
+function renderWeatherInsights() {
+  const list = document.querySelector('#weather-insights');
+  if (!list) return;
+
+  const insights = Array.isArray(weatherState.insights) && weatherState.insights.length
+    ? weatherState.insights
+    : [
+      { label: 'Vind', value: '--', note: 'Henter' },
+      { label: 'Luft', value: '--', note: 'Fuktighet' },
+      { label: 'Regn', value: '--', note: 'Neste 6 timer' },
+    ];
+
+  list.replaceChildren(...insights.slice(0, 3).map((item) => {
+    const card = document.createElement('article');
+    card.className = 'weather-insight-card';
+    card.innerHTML = `
+      <span class="weather-insight-label">${escapeHtml(item.label)}</span>
+      <strong class="weather-insight-value">${escapeHtml(item.value)}</strong>
+      <span class="weather-insight-note">${escapeHtml(item.note)}</span>
+    `;
+    return card;
+  }));
+}
+
+function renderRainSummary() {
+  const summary = document.querySelector('#rain-summary');
+  if (!summary) return;
+
+  const rain = Array.isArray(weatherState.rain) ? weatherState.rain : [];
+  const total = rain.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const maxProbability = rain.reduce((max, item) => Math.max(max, Number(item.probability || 0)), 0);
+
+  if (total >= 4 || maxProbability >= 75) {
+    summary.textContent = `${total.toFixed(1).replace('.', ',')} mm mulig`;
+  } else if (total > 0 || maxProbability >= 30) {
+    summary.textContent = `Liten sjanse · ${Math.round(maxProbability)}%`;
+  } else {
+    summary.textContent = 'Ingen nedbør forventet';
+  }
+}
+
+function renderHourlyForecast() {
+  const list = document.querySelector('#hourly-list');
+  if (!list) return;
+
+  const hourly = Array.isArray(weatherState.hourly) && weatherState.hourly.length ? weatherState.hourly : [];
+  list.replaceChildren(...hourly.slice(0, 12).map((item, index) => {
+    const card = document.createElement('article');
+    card.className = 'hourly-card';
+    const hour = index === 0 ? 'Nå' : item.hour;
+    const precipitation = Number(item.precipitation || 0);
+    const probability = Number(item.probability || 0);
+    card.innerHTML = `
+      <span class="hourly-time">${escapeHtml(hour)}</span>
+      <span class="hourly-icon" aria-hidden="true">${escapeHtml(item.icon || '🌤️')}</span>
+      <strong class="hourly-temp">${Math.round(Number(item.temp) || 0)}°</strong>
+      <span class="hourly-meta">${precipitation > 0 ? `${precipitation.toFixed(1).replace('.', ',')} mm` : `${Math.round(probability)}%`}</span>
+      <span class="hourly-wind">${Number(item.windSpeed || 0).toFixed(1).replace('.', ',')} m/s</span>
+    `;
+    return card;
+  }));
+}
+
+function renderBathingWeather() {
+  const bathing = weatherState.bathing || {};
+  const emoji = document.querySelector('#bathing-emoji');
+  const score = document.querySelector('#bathing-score');
+  const fill = document.querySelector('#bathing-score-fill');
+  const label = document.querySelector('#bathing-label');
+  const description = document.querySelector('#bathing-description');
+  const metrics = document.querySelector('#bathing-metrics');
+  const source = document.querySelector('#bathing-source');
+
+  const numericScore = Math.max(0, Math.min(100, Number(bathing.score) || 0));
+  if (emoji) emoji.textContent = bathing.emoji || '🌊';
+  if (score) score.textContent = `${Math.round(numericScore)}%`;
+  if (fill) fill.style.width = `${numericScore}%`;
+  if (label) label.textContent = bathing.label || 'Badevær';
+  if (description) description.textContent = bathing.description || 'Beregnet fra temperatur, vind og nedbør.';
+  if (source) source.textContent = bathing.source || 'Beregnes fra MET-varsel.';
+
+  if (metrics) {
+    const hasWaterTemperature = bathing.waterTemperature !== null
+      && bathing.waterTemperature !== undefined
+      && bathing.waterTemperature !== ''
+      && Number.isFinite(Number(bathing.waterTemperature));
+    const waterTemp = hasWaterTemperature
+      ? `${Number(bathing.waterTemperature).toFixed(1).replace('.', ',')}°`
+      : 'Ikke koblet';
+    const items = [
+      { label: 'Luft', value: `${Math.round(Number(bathing.airTemperature) || 0)}°` },
+      { label: 'Vann', value: waterTemp },
+      { label: 'Vind', value: `${Number(bathing.windSpeed || 0).toFixed(1).replace('.', ',')} m/s` },
+      { label: 'Regn', value: Number(bathing.rainAmount || 0) > 0 ? `${Number(bathing.rainAmount).toFixed(1).replace('.', ',')} mm` : 'Tørt' },
+    ];
+
+    metrics.replaceChildren(...items.map((item) => {
+      const metric = document.createElement('article');
+      metric.className = 'bathing-metric';
+      metric.innerHTML = `
+        <span>${escapeHtml(item.label)}</span>
+        <strong>${escapeHtml(item.value)}</strong>
+      `;
+      return metric;
+    }));
+  }
+}
+
+function renderWeatherExperience() {
+  renderWeatherSummary();
+  renderWeatherInsights();
+  renderRainSummary();
+  renderHourlyForecast();
+  renderBathingWeather();
+}
+
 async function loadWeather() {
   const requestId = ++weatherRequestSequence;
   const locationKey = getActiveLocationKey();
@@ -268,9 +422,13 @@ async function loadWeather() {
       source: previousLocation.source,
     };
     weatherState.current = payload.current || weatherState.current;
+    weatherState.summary = payload.summary || weatherState.summary;
+    weatherState.insights = Array.isArray(payload.insights) && payload.insights.length ? payload.insights : weatherState.insights;
     weatherState.uvIndex = Number(payload.current?.uvIndex ?? 0);
     weatherState.rain = Array.isArray(payload.rain) ? payload.rain : weatherState.rain;
     weatherState.temperature = Array.isArray(payload.temperature) ? payload.temperature : weatherState.temperature;
+    weatherState.hourly = Array.isArray(payload.hourly) && payload.hourly.length ? payload.hourly : weatherState.hourly;
+    weatherState.bathing = payload.bathing || weatherState.bathing;
     weatherState.forecast = Array.isArray(payload.forecast) && payload.forecast.length ? payload.forecast : weatherState.forecast;
   } catch (error) {
     if (requestId !== weatherRequestSequence || locationKey !== getActiveLocationKey()) {
@@ -282,6 +440,7 @@ async function loadWeather() {
 
   renderCurrentWeather();
   renderWeatherMeta();
+  renderWeatherExperience();
   drawRainChart();
   drawTemperatureChart();
   renderForecast();
@@ -775,6 +934,36 @@ function bindReportForm() {
   });
 }
 
+function getReportConditionForCurrentWeather() {
+  const condition = String(weatherState.current?.condition || '').toLowerCase();
+  if (condition.includes('regn') || condition.includes('byge')) return 'Regn / Byger';
+  if (condition.includes('snø') || condition.includes('sludd')) return 'Snø / Sludd';
+  if (condition.includes('tåke')) return 'Tåke';
+  if (condition.includes('vind')) return 'Kraftig vind';
+  if (condition.includes('sky') || condition.includes('overskyet')) return 'Overskyet';
+  return 'Sol / Klart';
+}
+
+function bindBathingReportShortcut() {
+  const button = document.querySelector('#bathing-report-button');
+  if (!button) return;
+
+  button.addEventListener('click', () => {
+    setActiveNavItem('report');
+
+    const location = document.querySelector('#report-location');
+    const temp = document.querySelector('#report-temp');
+    const condition = document.querySelector('#report-condition');
+
+    if (location && !location.value) location.value = weatherState.location.name || '';
+    if (temp && !temp.value) temp.value = String(Math.round(Number(weatherState.current?.temperature) || 0));
+    if (condition && !condition.value) condition.value = getReportConditionForCurrentWeather();
+
+    showToast('Rapporter hvordan været faktisk er ved badeplassen.');
+    window.setTimeout(() => document.querySelector('#report-name')?.focus(), 180);
+  });
+}
+
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;',
@@ -824,11 +1013,13 @@ async function initApp() {
   drawTemperatureChart();
   renderForecast();
   renderWeatherMeta();
+  renderWeatherExperience();
   renderObservations();
   renderNavigation();
   bindLocationSearch();
   bindWeatherLocation();
   bindReportForm();
+  bindBathingReportShortcut();
   bindFavorites();
   renderFavorites();
   await loadWeather();

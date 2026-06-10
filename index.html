@@ -57,6 +57,17 @@
             <button class="primary-button" type="submit">Søk</button>
           </form>
           <p id="location-search-status" class="vv-muted mt-2 text-xs">Søk eller del posisjon for lokale MET-data og rapporter.</p>
+
+          <article class="weather-summary-card mt-5">
+            <div>
+              <p class="section-label">Akkurat nå</p>
+              <h2 id="weather-summary-headline" class="vv-text mt-2 text-xl font-bold">Rolig værbilde</h2>
+              <p id="weather-summary-detail" class="vv-soft mt-2 text-sm leading-relaxed">Værvakt kombinerer MET-varsel med lokale rapporter når de finnes.</p>
+            </div>
+            <span id="weather-hero-icon" class="weather-hero-icon" aria-hidden="true">🌤️</span>
+          </article>
+
+          <div id="weather-insights" class="weather-insights-grid mt-3" aria-label="Værdetaljer"></div>
         </section>
 
         <div class="vv-divider" role="presentation"></div>
@@ -97,9 +108,42 @@
 
         <div class="vv-divider" role="presentation"></div>
 
+        <section aria-labelledby="hourly-title">
+          <div class="mb-4 flex items-center justify-between gap-4">
+            <h2 id="hourly-title" class="vv-text text-base font-bold">Neste timer</h2>
+            <p class="vv-muted text-right text-xs font-semibold">Time for time</p>
+          </div>
+          <div id="hourly-list" class="hourly-strip" aria-label="Time-for-time varsel"></div>
+        </section>
+
+        <div class="vv-divider" role="presentation"></div>
+
         <section aria-labelledby="forecast-title">
           <h2 id="forecast-title" class="vv-text mb-4 text-base font-bold">5-dagers varsel</h2>
           <div id="forecast-list" class="flex flex-col gap-1"></div>
+        </section>
+
+        <div class="vv-divider" role="presentation"></div>
+
+        <section id="bathing-section" class="glass-card bathing-card p-5" aria-labelledby="bathing-title">
+          <div class="bathing-head">
+            <div>
+              <p class="section-label">Sommermodus</p>
+              <h2 id="bathing-title" class="vv-text mt-3 text-xl font-bold">Badevær</h2>
+            </div>
+            <span id="bathing-emoji" class="bathing-emoji" aria-hidden="true">🌊</span>
+          </div>
+          <div class="bathing-score-wrap mt-4">
+            <div class="bathing-score-track" aria-hidden="true">
+              <span id="bathing-score-fill" class="bathing-score-fill"></span>
+            </div>
+            <strong id="bathing-score" class="bathing-score">--</strong>
+          </div>
+          <p id="bathing-label" class="vv-text mt-4 text-lg font-bold">Henter badevær</p>
+          <p id="bathing-description" class="vv-soft mt-2 text-sm leading-relaxed">Vi sjekker luft, vind og nedbør før vi gir badevær-vurdering.</p>
+          <div id="bathing-metrics" class="bathing-metrics mt-4"></div>
+          <p id="bathing-source" class="vv-muted mt-3 text-xs">Beregnes fra MET-varsel.</p>
+          <button id="bathing-report-button" class="vv-btn-ghost mt-4 flex min-h-11 w-full items-center justify-center gap-2 text-sm font-semibold" type="button">Send rapport fra badeplassen</button>
         </section>
 
         <div class="vv-divider" role="presentation"></div>
@@ -207,8 +251,8 @@
       <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
     </div>
 
-    <script src="vendor/leaflet/leaflet.js?v=20260605-admin2" defer></script>
-    <script src="app.js?v=20260605-admin2" defer></script>
-    <script src="script.js?v=20260605-admin2" defer></script>
+    <script src="vendor/leaflet/leaflet.js?v=20260610-weather1" defer></script>
+    <script src="app.js?v=20260610-weather1" defer></script>
+    <script src="script.js?v=20260610-weather1" defer></script>
   </body>
 </html>

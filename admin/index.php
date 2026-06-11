@@ -54,8 +54,10 @@ function vv_admin_render_shell(string $title, string $body, bool $isLogin = fals
         input{width:100%;min-height:46px;margin-bottom:14px;padding:0 13px;border:1px solid var(--line);border-radius:8px;background:#0f141a;color:var(--text);font-size:16px}.error{margin:0 0 14px;color:#ffbeca;font-weight:750}
         .desktop-warning{display:none;min-height:100vh;padding:28px;place-items:center;text-align:center}.desktop-warning .card{max-width:480px}.small{font-size:13px}
         .pager{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}.nowrap{white-space:nowrap}.coord{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--muted)}
+        .admin-section{margin-bottom:18px}.status-pill{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:850}.status-pending{background:rgba(255,209,102,.13);color:#ffe4a3;border:1px solid rgba(255,209,102,.24)}.status-approved{background:rgba(126,231,181,.13);color:#baf7d9;border:1px solid rgba(126,231,181,.24)}.status-sent{background:rgba(132,214,255,.13);color:#bfeeff;border:1px solid rgba(132,214,255,.24)}
+        .actions{display:flex;flex-wrap:wrap;gap:8px}.inline-form{display:inline}.button-good{background:#163126;border-color:#265946;color:#baf7d9}.copy-box{width:100%;min-height:190px;margin-top:12px;padding:13px;border:1px solid var(--line);border-radius:8px;background:#0f141a;color:var(--text);font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical}.note{margin:6px 0 0;color:var(--muted);font-size:12px;line-height:1.45}.subgrid{display:grid;gap:14px;grid-template-columns:1.25fr .75fr}
         @media (max-width:899px){.admin-wrap{display:none}.desktop-warning{display:grid}}
-        @media (max-width:1080px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.layout{grid-template-columns:1fr}}
+        @media (max-width:1080px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.layout,.subgrid{grid-template-columns:1fr}}
     </style></head><body class="' . vv_admin_h($bodyClass) . '">';
     echo '<div class="desktop-warning"><div class="card"><p class="eyebrow">Desktop only</p><h1>Admin åpnes på PC</h1><p class="muted">Dashboardet er bevisst skjult på mobil og nettbrett.</p></div></div>';
     echo $body;
@@ -89,7 +91,7 @@ if (isset($_GET['logout'])) {
 }
 
 $loginError = '';
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_SESSION['admin_authed'])) {
     $lockedUntil = (int) ($_SESSION['admin_locked_until'] ?? 0);
     if ($lockedUntil > time()) {
         $loginError = 'For mange forsøk. Vent litt før du prøver igjen.';
@@ -197,6 +199,76 @@ function vv_admin_ensure_visit_table(PDO $pdo): void
     ");
 }
 
+function vv_admin_ensure_bathing_place_table(PDO $pdo): void
+{
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS bathing_place_suggestions (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            place_name VARCHAR(120) NOT NULL,
+            latitude DECIMAL(10,7) NOT NULL,
+            longitude DECIMAL(10,7) NOT NULL,
+            reporter VARCHAR(120) NULL,
+            note VARCHAR(500) NULL,
+            status VARCHAR(20) NOT NULL DEFAULT 'pending',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            reviewed_at DATETIME NULL,
+            sent_at DATETIME NULL,
+            PRIMARY KEY (id),
+            KEY idx_bathing_place_status_created (status, created_at),
+            KEY idx_bathing_place_coords (latitude, longitude)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+}
+
+function vv_admin_bathing_status_label(string $status): string
+{
+    return match ($status) {
+        'approved' => 'Godkjent / klar',
+        'sent' => 'Sendt til Yr',
+        default => 'Pending',
+    };
+}
+
+function vv_admin_bathing_status_class(string $status): string
+{
+    return match ($status) {
+        'approved' => 'status-approved',
+        'sent' => 'status-sent',
+        default => 'status-pending',
+    };
+}
+
+function vv_admin_yr_export_text(array $rows): string
+{
+    if ($rows === []) {
+        return "Ingen godkjente badeplasser ennå.\n\nGodkjenn forslag først, så genereres listen her.";
+    }
+
+    $lines = [
+        'Hei Tommy!',
+        '',
+        'Her er badeplasser fra Værvakt som er kvalitetssikret og klare for å legges inn hos Yr:',
+        '',
+    ];
+
+    foreach ($rows as $row) {
+        $lat = number_format((float) $row['latitude'], 6, '.', '');
+        $lon = number_format((float) $row['longitude'], 6, '.', '');
+        $lines[] = '- ' . (string) $row['place_name'];
+        $lines[] = '  Lat/Lon: ' . $lat . ', ' . $lon;
+        $lines[] = '  Kontakt/innsender: ' . ((string) ($row['reporter'] ?? '') !== '' ? (string) $row['reporter'] : 'Ikke oppgitt');
+        if ((string) ($row['note'] ?? '') !== '') {
+            $lines[] = '  Notat: ' . (string) $row['note'];
+        }
+        $lines[] = '';
+    }
+
+    $lines[] = 'Mvh';
+    $lines[] = 'Værvakt.no';
+    return implode("\n", $lines);
+}
+
 $source = vv_admin_source($pdo);
 if (!$source) {
     vv_admin_render_shell('Dashboard', '<main class="admin-wrap"><section class="card"><h1>Ingen rapporttabell funnet</h1><p class="muted">Fant verken weather_reports eller reports.</p></section></main>');
@@ -205,6 +277,31 @@ if (!$source) {
 
 $table = $source['table'];
 $selectSql = vv_admin_select_sql($source);
+
+vv_admin_ensure_bathing_place_table($pdo);
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_action'])) {
+    if (!hash_equals((string) ($_SESSION['csrf'] ?? ''), (string) ($_POST['csrf'] ?? ''))) {
+        vv_admin_render_shell('Ugyldig handling', '<main class="admin-wrap"><section class="card"><h1>Ugyldig handling</h1><p class="muted">Last siden på nytt og prøv igjen.</p></section></main>');
+        exit;
+    }
+
+    $id = max(0, (int) ($_POST['id'] ?? 0));
+    $action = (string) ($_POST['admin_action'] ?? '');
+    if ($id > 0 && $action === 'approve_bathing_place') {
+        $stmt = $pdo->prepare("UPDATE bathing_place_suggestions SET status = 'approved', reviewed_at = NOW(), updated_at = NOW() WHERE id = ?");
+        $stmt->execute([$id]);
+    } elseif ($id > 0 && $action === 'mark_bathing_place_sent') {
+        $stmt = $pdo->prepare("UPDATE bathing_place_suggestions SET status = 'sent', sent_at = NOW(), reviewed_at = COALESCE(reviewed_at, NOW()), updated_at = NOW() WHERE id = ?");
+        $stmt->execute([$id]);
+    } elseif ($id > 0 && $action === 'delete_bathing_place') {
+        $stmt = $pdo->prepare('DELETE FROM bathing_place_suggestions WHERE id = ?');
+        $stmt->execute([$id]);
+    }
+
+    header('Location: /admin/#bathing-places');
+    exit;
+}
 
 if (($_GET['export'] ?? '') === 'reports_csv') {
     header('Content-Type: text/csv; charset=utf-8');
@@ -241,6 +338,11 @@ $locationRows = $pdo->query("SELECT location, COUNT(*) AS total FROM {$table} WH
 $conditionCol = $source['legacy'] ? 'conditions' : 'weather_condition';
 $conditionRows = $pdo->query("SELECT {$conditionCol} AS weather_condition, COUNT(*) AS total FROM {$table} WHERE {$conditionCol} IS NOT NULL AND {$conditionCol} <> '' GROUP BY {$conditionCol} ORDER BY total DESC, {$conditionCol} ASC LIMIT 8")->fetchAll(PDO::FETCH_ASSOC);
 $visitRows = $pdo->query("SELECT path, COUNT(*) AS views, COUNT(DISTINCT visitor_hash) AS visitors FROM site_visits WHERE created_at >= (NOW() - INTERVAL 24 HOUR) GROUP BY path ORDER BY views DESC LIMIT 8")->fetchAll(PDO::FETCH_ASSOC);
+$bathingRows = $pdo->query("SELECT id, place_name, latitude, longitude, reporter, note, status, created_at, reviewed_at, sent_at FROM bathing_place_suggestions ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 WHEN 'sent' THEN 2 ELSE 3 END, created_at DESC LIMIT 200")->fetchAll(PDO::FETCH_ASSOC);
+$approvedBathingRows = $pdo->query("SELECT id, place_name, latitude, longitude, reporter, note FROM bathing_place_suggestions WHERE status = 'approved' ORDER BY place_name ASC, created_at ASC LIMIT 200")->fetchAll(PDO::FETCH_ASSOC);
+$pendingBathingCount = vv_admin_count($pdo, "SELECT COUNT(*) FROM bathing_place_suggestions WHERE status = 'pending'");
+$approvedBathingCount = vv_admin_count($pdo, "SELECT COUNT(*) FROM bathing_place_suggestions WHERE status = 'approved'");
+$yrExportText = vv_admin_yr_export_text($approvedBathingRows);
 
 $pages = max(1, (int) ceil($totalReports / $perPage));
 $prevUrl = '/admin/?page=' . max(1, $page - 1);
@@ -256,6 +358,29 @@ $body .= '<article class="card"><p class="stat-label">Siste time</p><p class="st
 $body .= '<article class="card"><p class="stat-label">Rapporter totalt</p><p class="stat-value">' . vv_admin_h($totalReports) . '</p><p class="stat-note">' . vv_admin_h($reports24h) . ' siste 24 timer</p></article>';
 $body .= '<article class="card"><p class="stat-label">Kartpunkter</p><p class="stat-value">' . vv_admin_h($coordReports) . '</p><p class="stat-note">Rapporter med koordinater</p></article>';
 $body .= '</section>';
+
+$body .= '<section id="bathing-places" class="card admin-section"><div class="toolbar"><div><p class="eyebrow">Badeplass-bidrag</p><p class="muted small">' . vv_admin_h(count($bathingRows)) . ' forslag vist. ' . vv_admin_h($pendingBathingCount) . ' pending, ' . vv_admin_h($approvedBathingCount) . ' klar til Yr.</p></div><button class="button button-primary" type="button" onclick="navigator.clipboard && navigator.clipboard.writeText(document.getElementById(\'yr-list\').value)">Generer Yr-liste</button></div>';
+$body .= '<div class="subgrid"><div style="overflow:auto"><table><thead><tr><th>Badeplass</th><th>Koordinater</th><th>Bruker/kontakt</th><th>Status</th><th>Handling</th></tr></thead><tbody>';
+foreach ($bathingRows as $row) {
+    $status = (string) ($row['status'] ?? 'pending');
+    $coord = number_format((float) $row['latitude'], 6, '.', '') . ', ' . number_format((float) $row['longitude'], 6, '.', '');
+    $body .= '<tr><td><strong>' . vv_admin_h($row['place_name']) . '</strong>';
+    if ((string) ($row['note'] ?? '') !== '') {
+        $body .= '<p class="note">' . vv_admin_h($row['note']) . '</p>';
+    }
+    $body .= '<p class="note">Foreslått: ' . vv_admin_h($row['created_at']) . '</p></td>';
+    $body .= '<td class="coord">' . vv_admin_h($coord) . '</td><td>' . vv_admin_h((string) ($row['reporter'] ?? '') !== '' ? $row['reporter'] : 'Ikke oppgitt') . '</td>';
+    $body .= '<td><span class="status-pill ' . vv_admin_h(vv_admin_bathing_status_class($status)) . '">' . vv_admin_h(vv_admin_bathing_status_label($status)) . '</span></td><td><div class="actions">';
+    if ($status === 'pending') {
+        $body .= '<form class="inline-form" method="post"><input type="hidden" name="csrf" value="' . vv_admin_h($_SESSION['csrf']) . '"><input type="hidden" name="id" value="' . vv_admin_h($row['id']) . '"><button class="button button-good" name="admin_action" value="approve_bathing_place" type="submit">Godkjenn / klar</button></form>';
+    } elseif ($status === 'approved') {
+        $body .= '<form class="inline-form" method="post"><input type="hidden" name="csrf" value="' . vv_admin_h($_SESSION['csrf']) . '"><input type="hidden" name="id" value="' . vv_admin_h($row['id']) . '"><button class="button button-primary" name="admin_action" value="mark_bathing_place_sent" type="submit">Marker sendt</button></form>';
+    }
+    $body .= '<form class="inline-form" method="post" onsubmit="return confirm(\'Slette dette badeplassforslaget?\')"><input type="hidden" name="csrf" value="' . vv_admin_h($_SESSION['csrf']) . '"><input type="hidden" name="id" value="' . vv_admin_h($row['id']) . '"><button class="button button-danger" name="admin_action" value="delete_bathing_place" type="submit">Avvis / slett</button></form>';
+    $body .= '</div></td></tr>';
+}
+$body .= $bathingRows ? '' : '<tr><td colspan="5" class="muted">Ingen badeplassforslag ennå.</td></tr>';
+$body .= '</tbody></table></div><aside><p class="eyebrow">Generer Yr-liste</p><p class="muted small">Listen under tar bare med godkjente forslag. Marker som sendt etter at du har sendt e-posten.</p><textarea id="yr-list" class="copy-box" readonly>' . vv_admin_h($yrExportText) . '</textarea></aside></div></section>';
 
 $body .= '<section class="grid layout"><article class="card"><div class="toolbar"><div><p class="eyebrow">Alle rapporter</p><p class="muted small">Viser ' . vv_admin_h(count($reports)) . ' av ' . vv_admin_h($totalReports) . '</p></div><a class="button button-primary" href="/admin/?export=reports_csv">Last ned CSV</a></div>';
 $body .= '<div style="overflow:auto"><table><thead><tr><th>Tid</th><th>Bruker</th><th>Sted</th><th>Vær</th><th>Temp</th><th>Koordinater</th></tr></thead><tbody>';

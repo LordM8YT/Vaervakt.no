@@ -974,23 +974,83 @@ function getReportConditionForCurrentWeather() {
   return 'Sol / Klart';
 }
 
-function bindBathingReportShortcut() {
+function getSuggestedBathingPlaceName() {
+  const yrLocation = String(weatherState.bathing?.waterTemperatureLocation || '').split(',')[0]?.trim();
+  if (yrLocation) return yrLocation;
+
+  return String(weatherState.location.name || '')
+    .replace(/,\s*(NO|Norge|Norway)$/i, '')
+    .trim();
+}
+
+function prefillBathingPlaceForm(form) {
+  const placeName = form.querySelector('#bathing-place-name');
+  const lat = form.querySelector('#bathing-place-lat');
+  const lon = form.querySelector('#bathing-place-lon');
+
+  if (placeName && !placeName.value) placeName.value = getSuggestedBathingPlaceName();
+  if (lat && !lat.value && Number.isFinite(Number(weatherState.location.lat))) {
+    lat.value = Number(weatherState.location.lat).toFixed(6);
+  }
+  if (lon && !lon.value && Number.isFinite(Number(weatherState.location.lon))) {
+    lon.value = Number(weatherState.location.lon).toFixed(6);
+  }
+}
+
+function bindBathingPlaceSuggestion() {
   const button = document.querySelector('#bathing-report-button');
-  if (!button) return;
+  const form = document.querySelector('#bathing-place-form');
+  if (!button || !form) return;
 
   button.addEventListener('click', () => {
-    setActiveNavItem('report');
+    const isOpening = form.classList.contains('hidden-view');
+    form.classList.toggle('hidden-view', !isOpening);
+    button.setAttribute('aria-expanded', String(isOpening));
+    button.textContent = isOpening ? 'Lukk badeplassforslag' : 'Foreslå badeplass til Yr';
 
-    const location = document.querySelector('#report-location');
-    const temp = document.querySelector('#report-temp');
-    const condition = document.querySelector('#report-condition');
+    if (!isOpening) return;
 
-    if (location && !location.value) location.value = weatherState.location.name || '';
-    if (temp && !temp.value) temp.value = String(Math.round(Number(weatherState.current?.temperature) || 0));
-    if (condition && !condition.value) condition.value = getReportConditionForCurrentWeather();
+    prefillBathingPlaceForm(form);
+    window.setTimeout(() => form.querySelector('#bathing-place-name')?.focus(), 120);
+  });
 
-    showToast('Rapporter hvordan været faktisk er ved badeplassen.');
-    window.setTimeout(() => document.querySelector('#report-name')?.focus(), 180);
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const submitButton = form.querySelector('button[type="submit"]');
+    const data = Object.fromEntries(new FormData(form).entries());
+
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.dataset.originalText = submitButton.textContent || 'Send badeplassforslag';
+      submitButton.textContent = 'Sender...';
+    }
+
+    try {
+      const response = await fetch('api/bathing-place.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.message || 'Kunne ikke lagre badeplassforslaget.');
+      }
+
+      navigator.vibrate?.(12);
+      showToast(payload.message || 'Badeplassforslaget er sendt.');
+      form.reset();
+      form.classList.add('hidden-view');
+      button.setAttribute('aria-expanded', 'false');
+      button.textContent = 'Foreslå badeplass til Yr';
+    } catch (error) {
+      showToast(error.message || 'Kunne ikke sende badeplassforslaget.');
+    } finally {
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = submitButton.dataset.originalText || 'Send badeplassforslag';
+        delete submitButton.dataset.originalText;
+      }
+    }
   });
 }
 
@@ -1049,7 +1109,7 @@ async function initApp() {
   bindLocationSearch();
   bindWeatherLocation();
   bindReportForm();
-  bindBathingReportShortcut();
+  bindBathingPlaceSuggestion();
   bindFavorites();
   renderFavorites();
   await loadWeather();

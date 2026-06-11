@@ -143,7 +143,33 @@
           <p id="bathing-description" class="vv-soft mt-2 text-sm leading-relaxed">Vi sjekker luft, vind og nedbør før vi gir badevær-vurdering.</p>
           <div id="bathing-metrics" class="bathing-metrics mt-4"></div>
           <p id="bathing-source" class="vv-muted mt-3 text-xs">Beregnes fra MET-varsel.</p>
-          <button id="bathing-report-button" class="vv-btn-ghost mt-4 flex min-h-11 w-full items-center justify-center gap-2 text-sm font-semibold" type="button">Send rapport fra badeplassen</button>
+          <button id="bathing-report-button" class="vv-btn-ghost mt-4 flex min-h-11 w-full items-center justify-center gap-2 text-sm font-semibold" type="button">Foreslå badeplass til Yr</button>
+          <form id="bathing-place-form" class="bathing-place-form hidden-view" autocomplete="on">
+            <div>
+              <label class="field-label" for="bathing-place-name">Navn på badeplass</label>
+              <input id="bathing-place-name" class="form-field" name="place_name" type="text" maxlength="120" placeholder="For eksempel Hamresanden" required>
+            </div>
+            <div class="bathing-place-grid">
+              <div>
+                <label class="field-label" for="bathing-place-lat">Latitude</label>
+                <input id="bathing-place-lat" class="form-field" name="latitude" type="number" inputmode="decimal" step="0.000001" min="-90" max="90" placeholder="58.1502" required>
+              </div>
+              <div>
+                <label class="field-label" for="bathing-place-lon">Longitude</label>
+                <input id="bathing-place-lon" class="form-field" name="longitude" type="number" inputmode="decimal" step="0.000001" min="-180" max="180" placeholder="7.9470" required>
+              </div>
+            </div>
+            <div>
+              <label class="field-label" for="bathing-place-reporter">Navn eller e-post</label>
+              <input id="bathing-place-reporter" class="form-field" name="reporter" type="text" maxlength="120" placeholder="Valgfritt, men nyttig">
+            </div>
+            <div>
+              <label class="field-label" for="bathing-place-note">Notat</label>
+              <textarea id="bathing-place-note" class="form-field form-textarea" name="note" maxlength="500" placeholder="Kort notat hvis koordinatene bør sjekkes"></textarea>
+            </div>
+            <p class="vv-muted text-xs leading-relaxed">Forslaget havner i adminpanelet som “pending” før det sendes videre til Yr.</p>
+            <button class="primary-button w-full" type="submit">Send badeplassforslag</button>
+          </form>
         </section>
 
         <div class="vv-divider" role="presentation"></div>
@@ -251,8 +277,8 @@
       <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
     </div>
 
-    <script src="vendor/leaflet/leaflet.js?v=20260611-bath1" defer></script>
-    <script src="app.js?v=20260611-bath1" defer></script>
-    <script src="script.js?v=20260611-bath1" defer></script>
+    <script src="vendor/leaflet/leaflet.js?v=20260611-bathplaces1" defer></script>
+    <script src="app.js?v=20260611-bathplaces1" defer></script>
+    <script src="script.js?v=20260611-bathplaces1" defer></script>
   </body>
 </html>

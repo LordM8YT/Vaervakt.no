@@ -28,6 +28,7 @@ echo json_encode([
     'vapidPublicConfigured' => VAPID_PUBLIC !== '',
     'vapidPrivateConfigured' => VAPID_PRIVATE !== '',
     'vapidSubjectConfigured' => VAPID_SUBJECT !== '',
+    'yrBathConfigured' => defined('YR_BATH_API_KEY') && YR_BATH_API_KEY !== '',
     'checkedEnvFiles' => array_map('basename', $config['env_checked_paths'] ?? []),
     'phpVersion' => PHP_VERSION,
 ], JSON_UNESCAPED_UNICODE);

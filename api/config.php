@@ -19,6 +19,7 @@ $payload = [
         'dbConfigured' => DB_HOST !== '' && DB_NAME !== '' && DB_USER !== '',
         'vapidPublicConfigured' => VAPID_PUBLIC !== '',
         'vapidPrivateConfigured' => VAPID_PRIVATE !== '',
+        'yrBathConfigured' => defined('YR_BATH_API_KEY') && YR_BATH_API_KEY !== '',
     ],
 ];
 

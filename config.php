@@ -172,6 +172,10 @@ $config['vapid_public'] = VAPID_PUBLIC;
 $config['vapid_private'] = VAPID_PRIVATE;
 $config['vapid_subject'] = VAPID_SUBJECT;
 
+/** Yr badetemperaturer. Privat API-nøkkel fra Yr, aldri hardkodet i repoet. */
+define('YR_BATH_API_KEY', vaervakt_env_first(['YR_BATH_API_KEY', 'YR_BADETEMP_API_KEY', 'YR_WATER_TEMPERATURE_API_KEY']) ?? '');
+$config['yr_bath_api_key_configured'] = YR_BATH_API_KEY !== '';
+
 /** Valgfri støtte-lenke, f.eks. Vipps/Ko-fi/Stripe Checkout */
 define('SUPPORT_URL', vaervakt_env('SUPPORT_URL') ?? 'https://betal.vipps.no/opy01u');
 define('SUPPORT_LABEL', vaervakt_env('SUPPORT_LABEL') ?? 'Støtt med Vipps');

@@ -21,6 +21,15 @@ function vv_met_user_agent(): string
     return 'Vaervakt.no/2026 (' . $contact . ')';
 }
 
+function vv_distance_km(float $lat1, float $lon1, float $lat2, float $lon2): float
+{
+    $earthRadius = 6371.0;
+    $dLat = deg2rad($lat2 - $lat1);
+    $dLon = deg2rad($lon2 - $lon1);
+    $a = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon / 2) ** 2;
+    return $earthRadius * 2 * atan2(sqrt($a), sqrt(1 - $a));
+}
+
 function vv_feels_like(float $temperature, float $windSpeed, float $humidity): float
 {
     $windKmh = $windSpeed * 3.6;
@@ -154,6 +163,105 @@ function vv_fetch_met(float $lat, float $lon): array
     return $decoded;
 }
 
+function vv_fetch_yr_bath_temperatures(float $lat, float $lon): ?array
+{
+    if (!defined('YR_BATH_API_KEY') || trim((string) YR_BATH_API_KEY) === '') {
+        return null;
+    }
+
+    $cacheKey = sprintf('vaervakt_yr_bath_%s_%s.json', str_replace('.', '_', (string) round($lat, 2)), str_replace('.', '_', (string) round($lon, 2)));
+    $cachePath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . $cacheKey;
+    if (is_readable($cachePath) && filemtime($cachePath) !== false && time() - (int) filemtime($cachePath) < 1800) {
+        $cached = file_get_contents($cachePath);
+        if ($cached !== false) {
+            $decoded = json_decode($cached, true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+    }
+
+    $location = rawurlencode((string) round($lat, 6) . ',' . (string) round($lon, 6));
+    $url = 'https://badetemperaturer.yr.no/api/locations/' . $location . '/nearestwatertemperatures';
+    $raw = false;
+    $statusCode = 0;
+
+    if (function_exists('curl_init')) {
+        $curl = curl_init($url);
+        curl_setopt_array($curl, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 8,
+            CURLOPT_HTTPHEADER => [
+                'Accept: application/json',
+                'User-Agent: ' . vv_met_user_agent(),
+                'apikey: ' . YR_BATH_API_KEY,
+            ],
+        ]);
+        $raw = curl_exec($curl);
+        $statusCode = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+    }
+
+    if ($raw === false) {
+        $context = stream_context_create([
+            'http' => [
+                'header' => "User-Agent: " . vv_met_user_agent() . "\r\nAccept: application/json\r\napikey: " . YR_BATH_API_KEY . "\r\n",
+                'timeout' => 8,
+            ],
+        ]);
+        $raw = file_get_contents($url, false, $context);
+        if (isset($http_response_header) && is_array($http_response_header)) {
+            foreach ($http_response_header as $header) {
+                if (preg_match('/^HTTP\/\S+\s+(\d+)/', $header, $matches)) {
+                    $statusCode = (int) $matches[1];
+                    break;
+                }
+            }
+        }
+    }
+
+    if ($statusCode === 404) {
+        file_put_contents($cachePath, '[]', LOCK_EX);
+        return [];
+    }
+
+    if ($raw === false || $statusCode >= 400) {
+        error_log('Yr bath temperature api failed with HTTP ' . $statusCode);
+        return null;
+    }
+
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        error_log('Yr bath temperature api returned unexpected response.');
+        return null;
+    }
+
+    file_put_contents($cachePath, $raw, LOCK_EX);
+    return $decoded;
+}
+
+function vv_nearest_bath_temperature(array $items, float $lat, float $lon): ?array
+{
+    $valid = [];
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $position = $item['position'] ?? [];
+        $itemLat = isset($position['lat']) ? (float) $position['lat'] : null;
+        $itemLon = isset($position['lon']) ? (float) $position['lon'] : null;
+        $temperature = isset($item['temperature']) ? (float) $item['temperature'] : null;
+        if ($itemLat === null || $itemLon === null || $temperature === null) {
+            continue;
+        }
+        $item['distanceKm'] = vv_number(vv_distance_km($lat, $lon, $itemLat, $itemLon), 1);
+        $valid[] = $item;
+    }
+
+    usort($valid, static fn(array $a, array $b): int => ($a['distanceKm'] <=> $b['distanceKm']));
+    return $valid[0] ?? null;
+}
+
 function vv_details(array $point): array
 {
     return $point['data']['instant']['details'] ?? [];
@@ -240,7 +348,7 @@ function vv_build_summary(string $condition, float $temperature, float $windSpee
     ];
 }
 
-function vv_build_bathing(array $timeseries, array $nowDetails): array
+function vv_build_bathing(array $timeseries, array $nowDetails, ?array $bathTemperature = null): array
 {
     $temperature = (float) ($nowDetails['air_temperature'] ?? 0);
     $windSpeed = (float) ($nowDetails['wind_speed'] ?? 0);
@@ -253,7 +361,13 @@ function vv_build_bathing(array $timeseries, array $nowDetails): array
         $rainProbability = max($rainProbability, vv_precipitation_probability($point));
     }
 
-    if ($rainAmount >= 2 || $rainProbability >= 70) {
+    $waterTemperature = $bathTemperature !== null ? (float) ($bathTemperature['temperature'] ?? 0) : null;
+    if ($waterTemperature !== null && $waterTemperature >= 19 && $rainAmount < 2 && $rainProbability < 70 && $windSpeed <= 8) {
+        $score = min(96, max(76, (int) round(($waterTemperature - 14) * 7 + 62)));
+        $label = $waterTemperature >= 22 ? 'Vannet er digg' : 'Badeklar';
+        $emoji = '🏖️';
+        $description = 'Yr har en fersk badetemperatur i nærheten. Kombinert med været ser dette ut som en reell bademulighet.';
+    } elseif ($rainAmount >= 2 || $rainProbability >= 70) {
         $score = 42;
         $label = 'Vent litt';
         $emoji = '🌧️';
@@ -272,13 +386,21 @@ function vv_build_bathing(array $timeseries, array $nowDetails): array
         $score = 56;
         $label = 'Litt friskt';
         $emoji = '🩳';
-        $description = 'Mulig for de tøffe. Sjekk lokale badetemp-rapporter før du hopper uti.';
+        $description = $waterTemperature !== null
+            ? 'Lufta er litt frisk, men badetemperaturen i nærheten gir et bedre bilde.'
+            : 'Mulig for de tøffe. Sjekk badetemp når det finnes en Yr-måling i nærheten.';
     } else {
         $score = 34;
         $label = 'Kaldt på land';
         $emoji = '🧊';
-        $description = 'Ikke akkurat sydenstemning. Badevær-kortet kan fortsatt være nyttig for de uredde.';
+        $description = $waterTemperature !== null
+            ? 'Kaldt på land, men vannmålingen fra Yr gir deg et mer konkret valg.'
+            : 'Ikke akkurat sydenstemning. Badevær-kortet kan fortsatt være nyttig for de uredde.';
     }
+
+    $locationName = $bathTemperature !== null ? trim((string) ($bathTemperature['locationName'] ?? '')) : '';
+    $municipality = $bathTemperature !== null ? trim((string) ($bathTemperature['municipality'] ?? '')) : '';
+    $waterLocation = trim($locationName . ($municipality !== '' ? ', ' . $municipality : ''));
 
     return [
         'score' => $score,
@@ -290,8 +412,15 @@ function vv_build_bathing(array $timeseries, array $nowDetails): array
         'rainAmount' => vv_number($rainAmount, 1),
         'rainProbability' => vv_number($rainProbability, 0),
         'uvIndex' => vv_number($uvIndex, 1),
-        'waterTemperature' => null,
-        'source' => 'Beregnet fra MET-varsel. Badetemp kan kobles på når Yr-nøkkel eller lokale målinger er klare.',
+        'waterTemperature' => $waterTemperature !== null ? vv_number($waterTemperature, 1) : null,
+        'waterTemperatureLocation' => $waterLocation !== '' ? $waterLocation : null,
+        'waterTemperatureTime' => $bathTemperature['time'] ?? null,
+        'waterTemperatureDistanceKm' => isset($bathTemperature['distanceKm']) ? vv_number((float) $bathTemperature['distanceKm'], 1) : null,
+        'waterTemperatureHeated' => (bool) ($bathTemperature['heatedWater'] ?? false),
+        'credit' => $waterTemperature !== null ? 'Badetemperaturer levert av Yr' : null,
+        'source' => $waterTemperature !== null
+            ? 'Badetemperaturer levert av Yr'
+            : 'Badetemp ikke funnet i nærheten ennå. Badevær beregnes fra luft, vind og regn.',
     ];
 }
 
@@ -323,7 +452,12 @@ try {
     $rainAmountNext6h = array_reduce($rain, static fn(float $carry, array $item): float => $carry + (float) ($item['amount'] ?? 0), 0.0);
     $rainProbabilityNext6h = array_reduce($rain, static fn(float $carry, array $item): float => max($carry, (float) ($item['probability'] ?? 0)), 0.0);
     $summary = vv_build_summary(vv_symbol_label($symbol), $currentTemperature, $currentWindSpeed, $rainAmountNext6h, $rainProbabilityNext6h);
-    $bathing = vv_build_bathing($timeseries, $nowDetails);
+    $bathTemperature = null;
+    $bathTemperatureItems = vv_fetch_yr_bath_temperatures($lat, $lon);
+    if (is_array($bathTemperatureItems)) {
+        $bathTemperature = vv_nearest_bath_temperature($bathTemperatureItems, $lat, $lon);
+    }
+    $bathing = vv_build_bathing($timeseries, $nowDetails, $bathTemperature);
     $hourly = vv_build_hourly($timeseries);
 
     $temperature = [];

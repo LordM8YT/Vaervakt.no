@@ -110,3 +110,50 @@ jobs:
               ./ \
               "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}:${WEBHUSET_REMOTE_PATH}"
           fi
+
+      - name: Sync optional runtime secrets
+        timeout-minutes: 2
+        env:
+          WEBHUSET_HOST: linweb22.hmg9.webhuset.no
+          WEBHUSET_PASSWORD: ${{ secrets.WEBHUSET_PASSWORD || secrets.VAERVAKT || vars.WEBHUSET_PASSWORD || vars.VAERVAKT }}
+          WEBHUSET_PORT: 22
+          WEBHUSET_REMOTE_PATH: /home/X/xnvrvaktpuano/www
+          WEBHUSET_SSH_KEY: ${{ secrets.WEBHUSET_SSH_KEY }}
+          WEBHUSET_USERNAME: xnvrvaktpuano
+          YR_BATH_API_KEY: ${{ secrets.YR_BATH_API_KEY || vars.YR_BATH_API_KEY }}
+        run: |
+          set -eu
+
+          if [ -z "${YR_BATH_API_KEY:-}" ]; then
+            echo "YR_BATH_API_KEY not configured; skipping optional runtime secret sync."
+            exit 0
+          fi
+
+          update_env='
+            set -eu
+            cd "$1"
+            touch .env
+            chmod 600 .env || true
+            if grep -q "^YR_BATH_API_KEY=" .env; then
+              tmp="$(mktemp)"
+              awk -v value="$2" '"'"'BEGIN{done=0} /^YR_BATH_API_KEY=/{print "YR_BATH_API_KEY=" value; done=1; next} {print} END{if(!done) print "YR_BATH_API_KEY=" value}'"'"' .env > "$tmp"
+              mv "$tmp" .env
+            else
+              printf "\nYR_BATH_API_KEY=%s\n" "$2" >> .env
+            fi
+          '
+
+          if [ -z "${WEBHUSET_SSH_KEY:-}" ] && [ -n "${WEBHUSET_PASSWORD:-}" ]; then
+            sshpass -p "${WEBHUSET_PASSWORD}" \
+              ssh -o ConnectTimeout=20 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -p "${WEBHUSET_PORT:-22}" \
+              "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}" \
+              "sh -s" -- "${WEBHUSET_REMOTE_PATH}" "${YR_BATH_API_KEY}" <<EOF
+          ${update_env}
+          EOF
+          else
+            ssh -o ConnectTimeout=20 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -p "${WEBHUSET_PORT:-22}" \
+              "${WEBHUSET_USERNAME}@${WEBHUSET_HOST}" \
+              "sh -s" -- "${WEBHUSET_REMOTE_PATH}" "${YR_BATH_API_KEY}" <<EOF
+          ${update_env}
+          EOF
+          fi

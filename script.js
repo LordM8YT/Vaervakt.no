@@ -86,7 +86,7 @@ function syncSupportCard() {
   }
 }
 
-const SERVICE_WORKER_VERSION = '20260610-weather1';
+const SERVICE_WORKER_VERSION = '20260611-bath1';
 const SERVICE_WORKER_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
 let serviceWorkerReloading = false;
 let serviceWorkerReloadListenerBound = false;

@@ -63,6 +63,11 @@ const weatherState = {
     rainProbability: 0,
     uvIndex: 0,
     waterTemperature: null,
+    waterTemperatureLocation: null,
+    waterTemperatureTime: null,
+    waterTemperatureDistanceKm: null,
+    waterTemperatureHeated: false,
+    credit: null,
     source: 'Beregnes fra MET-varsel.',
   },
   observations: [
@@ -340,6 +345,31 @@ function renderHourlyForecast() {
   }));
 }
 
+function formatBathingSource(bathing) {
+  if (!bathing) return 'Beregnes fra MET-varsel.';
+
+  const parts = [];
+  if (bathing.credit) parts.push(bathing.credit);
+  if (bathing.waterTemperatureLocation) parts.push(bathing.waterTemperatureLocation);
+  if (Number.isFinite(Number(bathing.waterTemperatureDistanceKm))) {
+    parts.push(`${Number(bathing.waterTemperatureDistanceKm).toFixed(1).replace('.', ',')} km unna`);
+  }
+  if (bathing.waterTemperatureTime) {
+    const date = new Date(bathing.waterTemperatureTime);
+    if (!Number.isNaN(date.getTime())) {
+      parts.push(new Intl.DateTimeFormat('nb-NO', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(date));
+    }
+  }
+  if (bathing.waterTemperatureHeated) parts.push('oppvarmet vann');
+
+  return parts.length ? parts.join(' · ') : (bathing.source || 'Beregnes fra MET-varsel.');
+}
+
 function renderBathingWeather() {
   const bathing = weatherState.bathing || {};
   const emoji = document.querySelector('#bathing-emoji');
@@ -356,7 +386,7 @@ function renderBathingWeather() {
   if (fill) fill.style.width = `${numericScore}%`;
   if (label) label.textContent = bathing.label || 'Badevær';
   if (description) description.textContent = bathing.description || 'Beregnet fra temperatur, vind og nedbør.';
-  if (source) source.textContent = bathing.source || 'Beregnes fra MET-varsel.';
+  if (source) source.textContent = formatBathingSource(bathing);
 
   if (metrics) {
     const hasWaterTemperature = bathing.waterTemperature !== null
@@ -365,7 +395,7 @@ function renderBathingWeather() {
       && Number.isFinite(Number(bathing.waterTemperature));
     const waterTemp = hasWaterTemperature
       ? `${Number(bathing.waterTemperature).toFixed(1).replace('.', ',')}°`
-      : 'Ikke koblet';
+      : 'Ingen Yr-måling';
     const items = [
       { label: 'Luft', value: `${Math.round(Number(bathing.airTemperature) || 0)}°` },
       { label: 'Vann', value: waterTemp },

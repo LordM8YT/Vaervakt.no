@@ -1,11 +1,11 @@
-const CACHE_NAME = 'vaervakt-2026-v16';
-const ASSET_VERSION = '20260611-bathsearch1';
+const CACHE_NAME = 'vaervakt-2026-v17';
+const ASSET_VERSION = '20260611-ui1';
 const PRECACHE_URLS = [
   './',
   './index.html',
-  './tailwind.css',
-  './styles.css',
-  './vendor/leaflet/leaflet.css',
+  `./tailwind.css?v=${ASSET_VERSION}`,
+  `./styles.css?v=${ASSET_VERSION}`,
+  `./vendor/leaflet/leaflet.css?v=${ASSET_VERSION}`,
   `./vendor/leaflet/leaflet.js?v=${ASSET_VERSION}`,
   `./app.js?v=${ASSET_VERSION}`,
   `./script.js?v=${ASSET_VERSION}`,

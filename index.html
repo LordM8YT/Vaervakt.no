@@ -8,16 +8,29 @@
     <meta name="vapid-public-key" content="">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="icons/vaervakt-icon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-    <link rel="stylesheet" href="tailwind.css">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css?v=20260611-ui1">
+    <link rel="stylesheet" href="tailwind.css?v=20260611-ui1">
+    <link rel="stylesheet" href="styles.css?v=20260611-ui1">
     <title>Værvakt 2026</title>
   </head>
   <body class="vaervakt-body text-white">
     <div id="root" class="app-root relative">
+      <header class="app-topbar">
+        <a class="brand-lockup" href="/" aria-label="Værvakt hjem">
+          <span class="brand-mark" aria-hidden="true">V</span>
+          <span>
+            <strong>Værvakt</strong>
+            <small>2026</small>
+          </span>
+        </a>
+        <div class="topbar-status" aria-label="Status">
+          <span>MET</span>
+          <span>Live rapporter</span>
+        </div>
+      </header>
       <main class="app-main mx-auto flex w-full max-w-xl flex-col px-5">
         <div class="app-view flex flex-col gap-8" data-view="home">
-        <section aria-labelledby="current-weather-title" class="pt-2">
+        <section aria-labelledby="current-weather-title" class="hero-panel pt-2">
           <div class="mb-6">
             <p id="current-weather-title" class="vv-text text-base font-bold">Kristiansand, NO</p>
             <p id="location-source" class="vv-muted mt-1 text-sm">Standarddata fra Kristiansand. Del posisjon eller søk etter sted.</p>
@@ -72,7 +85,7 @@
 
         <div class="vv-divider" role="presentation"></div>
 
-        <section aria-labelledby="rain-title">
+        <section class="dashboard-panel panel-rain" aria-labelledby="rain-title">
           <div class="mb-4 flex items-center justify-between gap-4">
             <div class="flex items-center gap-2">
               <span aria-hidden="true" class="text-lg">🌧</span>
@@ -99,7 +112,7 @@
 
         <div class="vv-divider" role="presentation"></div>
 
-        <section aria-labelledby="temp-title">
+        <section class="dashboard-panel panel-temperature" aria-labelledby="temp-title">
           <h2 id="temp-title" class="vv-text mb-4 text-base font-bold">Dagens temperatur</h2>
           <div class="chart-panel chart-panel--short">
             <svg id="temperature-chart" class="h-full w-full" viewBox="0 0 500 128" role="img" aria-label="Temperaturgraf for kvelden"></svg>
@@ -108,7 +121,7 @@
 
         <div class="vv-divider" role="presentation"></div>
 
-        <section aria-labelledby="hourly-title">
+        <section class="dashboard-panel panel-wide" aria-labelledby="hourly-title">
           <div class="mb-4 flex items-center justify-between gap-4">
             <h2 id="hourly-title" class="vv-text text-base font-bold">Neste timer</h2>
             <p class="vv-muted text-right text-xs font-semibold">Time for time</p>
@@ -118,7 +131,7 @@
 
         <div class="vv-divider" role="presentation"></div>
 
-        <section aria-labelledby="forecast-title">
+        <section class="dashboard-panel" aria-labelledby="forecast-title">
           <h2 id="forecast-title" class="vv-text mb-4 text-base font-bold">5-dagers varsel</h2>
           <div id="forecast-list" class="flex flex-col gap-1"></div>
         </section>
@@ -176,7 +189,7 @@
               <label class="field-label" for="bathing-place-note">Notat</label>
               <textarea id="bathing-place-note" class="form-field form-textarea" name="note" maxlength="500" placeholder="Kort notat hvis koordinatene bør sjekkes"></textarea>
             </div>
-            <p class="vv-muted text-xs leading-relaxed">Forslaget havner i adminpanelet som “pending” før det sendes videre til Yr.</p>
+            <p class="vv-muted text-xs leading-relaxed">Forslaget lagres til kontroll før det sendes videre til Yr.</p>
             <button class="primary-button w-full" type="submit">Send badeplassforslag</button>
           </form>
         </section>
@@ -286,8 +299,8 @@
       <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
     </div>
 
-    <script src="vendor/leaflet/leaflet.js?v=20260611-bathsearch1" defer></script>
-    <script src="app.js?v=20260611-bathsearch1" defer></script>
-    <script src="script.js?v=20260611-bathsearch1" defer></script>
+    <script src="vendor/leaflet/leaflet.js?v=20260611-ui1" defer></script>
+    <script src="app.js?v=20260611-ui1" defer></script>
+    <script src="script.js?v=20260611-ui1" defer></script>
   </body>
 </html>

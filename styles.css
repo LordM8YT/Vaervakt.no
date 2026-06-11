@@ -1156,3 +1156,320 @@ html {
     transform: scale(0.72);
   }
 }
+
+/* 2026 app refresh: brighter, calmer and closer to a native weather app. */
+:root {
+  --vv-bg: #eef6fb;
+  --vv-bg-deep: #dcecf5;
+  --vv-surface: rgba(255, 255, 255, 0.86);
+  --vv-surface-strong: rgba(255, 255, 255, 0.94);
+  --vv-surface-soft: rgba(255, 255, 255, 0.68);
+  --vv-border: rgba(31, 66, 88, 0.12);
+  --vv-border-strong: rgba(14, 116, 144, 0.22);
+  --vv-text: #102033;
+  --vv-text-soft: rgba(16, 32, 51, 0.72);
+  --vv-text-muted: rgba(16, 32, 51, 0.52);
+  --vv-accent: #0284c7;
+  --vv-accent-strong: #0ea5e9;
+  --vv-teal: #0f766e;
+  --vv-warm: #ea580c;
+  --vv-warning: #ca8a04;
+  --vv-shadow: 0 18px 50px rgba(22, 64, 96, 0.16);
+}
+
+html {
+  background: var(--vv-bg-deep);
+}
+
+.vaervakt-body {
+  background:
+    linear-gradient(160deg, rgba(14, 165, 233, 0.18), transparent 36%),
+    linear-gradient(28deg, rgba(20, 184, 166, 0.12), transparent 34%),
+    linear-gradient(180deg, #e4f5ff 0%, #f8fbfd 44%, #e8f0f5 100%);
+  color: var(--vv-text);
+}
+
+.app-root {
+  background:
+    linear-gradient(rgba(16, 32, 51, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16, 32, 51, 0.035) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+.app-topbar {
+  background: linear-gradient(180deg, rgba(238, 246, 251, 0.94), rgba(238, 246, 251, 0.72), transparent);
+}
+
+.brand-mark {
+  border-color: rgba(14, 116, 144, 0.2);
+  background: #ffffff;
+  color: var(--vv-accent);
+  box-shadow: 0 10px 26px rgba(14, 116, 144, 0.12);
+}
+
+.brand-lockup,
+.brand-lockup small,
+.topbar-status span,
+.vv-text,
+.vv-soft,
+.vv-muted {
+  color: var(--vv-text);
+}
+
+.brand-lockup small,
+.vv-muted {
+  color: var(--vv-text-muted);
+}
+
+.vv-soft {
+  color: var(--vv-text-soft);
+}
+
+.topbar-status span {
+  border-color: rgba(16, 32, 51, 0.1);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 10px 24px rgba(22, 64, 96, 0.1);
+}
+
+.app-main {
+  gap: 1rem;
+}
+
+.app-view {
+  gap: 1rem;
+}
+
+.vv-divider {
+  display: none;
+}
+
+.hero-panel {
+  border: 0;
+  background:
+    linear-gradient(140deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.74) 42%, rgba(186, 230, 253, 0.82)),
+    linear-gradient(180deg, #d9f2ff, #b7e3f8);
+  box-shadow: 0 24px 70px rgba(14, 116, 144, 0.18);
+}
+
+.hero-panel::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: min(42%, 28rem);
+  height: 56%;
+  background: linear-gradient(135deg, transparent, rgba(14, 165, 233, 0.16));
+  content: "";
+  pointer-events: none;
+}
+
+.hero-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+.weather-temp {
+  color: #071827;
+  text-shadow: 0 10px 28px rgba(14, 116, 144, 0.12);
+}
+
+.weather-unit {
+  color: rgba(7, 24, 39, 0.82);
+}
+
+.weather-meta-card,
+.weather-insight-card,
+.weather-summary-card {
+  border-color: rgba(14, 116, 144, 0.12);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 12px 28px rgba(14, 116, 144, 0.08);
+}
+
+.weather-meta-label,
+.weather-meta-note,
+.weather-insight-label,
+.weather-insight-note,
+.field-label {
+  color: rgba(16, 32, 51, 0.56);
+}
+
+.weather-meta-value,
+.weather-insight-value {
+  color: var(--vv-text);
+}
+
+.dashboard-panel,
+.glass-card {
+  border-color: var(--vv-border);
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: var(--vv-shadow);
+  backdrop-filter: blur(18px);
+}
+
+.panel-rain {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(232, 247, 255, 0.82));
+}
+
+.panel-temperature {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 243, 226, 0.82));
+}
+
+.chart-panel {
+  border-color: rgba(16, 32, 51, 0.08);
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.chart-grid-line {
+  stroke: rgba(16, 32, 51, 0.08);
+}
+
+.chart-axis-label {
+  fill: rgba(16, 32, 51, 0.52);
+}
+
+.hourly-card,
+.obs-item,
+.favorite-item,
+.bathing-metric,
+.bathing-search,
+.bathing-result-card,
+.bathing-place-form,
+.patch-card {
+  border-color: rgba(16, 32, 51, 0.1);
+  background: rgba(255, 255, 255, 0.66);
+  box-shadow: 0 10px 24px rgba(22, 64, 96, 0.07);
+}
+
+.section-label {
+  color: rgba(16, 32, 51, 0.68);
+}
+
+.live-pill,
+.new-badge {
+  border-color: rgba(14, 116, 144, 0.16);
+  background: rgba(14, 165, 233, 0.1);
+  color: #075985;
+}
+
+.live-dot {
+  background: #0ea5e9;
+}
+
+.obs-temp,
+.forecast-temp {
+  color: #0369a1;
+}
+
+.forecast-row {
+  border-bottom-color: rgba(16, 32, 51, 0.08);
+}
+
+.forecast-track,
+.bathing-score-track {
+  background: rgba(16, 32, 51, 0.1);
+}
+
+.bathing-card {
+  background:
+    linear-gradient(140deg, rgba(240, 253, 250, 0.94), rgba(255, 255, 255, 0.82) 48%, rgba(204, 251, 241, 0.72));
+}
+
+.bathing-result-temp {
+  color: #0f766e;
+}
+
+.form-field {
+  border-color: rgba(16, 32, 51, 0.1);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--vv-text);
+}
+
+.form-field::placeholder {
+  color: rgba(16, 32, 51, 0.45);
+}
+
+.primary-button {
+  border-color: rgba(14, 116, 144, 0.16);
+  background: linear-gradient(180deg, #0ea5e9, #0284c7);
+  color: #ffffff;
+  box-shadow: 0 14px 28px rgba(14, 116, 144, 0.22);
+}
+
+.vv-btn-ghost,
+.favorite-remove,
+.bathing-result-action {
+  border-color: rgba(16, 32, 51, 0.1);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--vv-text-soft);
+}
+
+.empty-state {
+  border-color: rgba(16, 32, 51, 0.16);
+  color: var(--vv-text-muted);
+}
+
+.vv-map {
+  border-color: rgba(16, 32, 51, 0.1);
+  background: #dcecf5;
+}
+
+.bottom-nav {
+  background: linear-gradient(180deg, transparent, rgba(238, 246, 251, 0.84) 24%, rgba(238, 246, 251, 0.96));
+}
+
+.bottom-nav-inner {
+  border-color: rgba(16, 32, 51, 0.1);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 18px 46px rgba(22, 64, 96, 0.16);
+}
+
+.nav-button {
+  color: rgba(16, 32, 51, 0.45);
+}
+
+.nav-button[data-active="true"] {
+  background: rgba(14, 165, 233, 0.12);
+  color: #0369a1;
+}
+
+.toast {
+  border-color: rgba(16, 32, 51, 0.12);
+  background: rgba(16, 32, 51, 0.94);
+  color: #ffffff;
+}
+
+@media (max-width: 759px) {
+  .app-main {
+    padding-top: 0.65rem;
+  }
+
+  .hero-panel {
+    padding: 1.25rem;
+  }
+
+  .weather-temp {
+    font-size: clamp(4.5rem, 24vw, 6.4rem);
+  }
+
+  .weather-meta-grid {
+    gap: 0.7rem;
+  }
+
+  .weather-meta-card {
+    min-height: 5.75rem;
+  }
+
+  .weather-summary-card {
+    margin-top: 0.9rem;
+  }
+
+  #location-search-status {
+    display: none;
+  }
+
+  .dashboard-panel,
+  .glass-card {
+    padding: 1rem;
+  }
+}

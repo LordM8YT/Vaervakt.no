@@ -86,6 +86,17 @@ function vaervakt_env_first(array $keys): ?string
     return null;
 }
 
+function vaervakt_clean_header_secret(?string $value, string $headerName): string
+{
+    $value = trim((string) $value);
+    if ($value === '') {
+        return '';
+    }
+
+    $pattern = '/^' . preg_quote($headerName, '/') . '\s*:\s*/i';
+    return trim((string) preg_replace($pattern, '', $value));
+}
+
 function vaervakt_env_paths(): array
 {
     $paths = [];
@@ -173,7 +184,7 @@ $config['vapid_private'] = VAPID_PRIVATE;
 $config['vapid_subject'] = VAPID_SUBJECT;
 
 /** Yr badetemperaturer. Privat API-nøkkel fra Yr, aldri hardkodet i repoet. */
-define('YR_BATH_API_KEY', vaervakt_env_first(['YR_BATH_API_KEY', 'YR_BADETEMP_API_KEY', 'YR_WATER_TEMPERATURE_API_KEY']) ?? '');
+define('YR_BATH_API_KEY', vaervakt_clean_header_secret(vaervakt_env_first(['YR_BATH_API_KEY', 'YR_BADETEMP_API_KEY', 'YR_WATER_TEMPERATURE_API_KEY']), 'apikey'));
 $config['yr_bath_api_key_configured'] = YR_BATH_API_KEY !== '';
 
 /** Valgfri støtte-lenke, f.eks. Vipps/Ko-fi/Stripe Checkout */

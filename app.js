@@ -626,6 +626,7 @@ async function loadWeather() {
 
   renderCurrentWeather();
   renderWeatherMeta();
+  renderHomePlaces();
   renderWeatherExperience();
   drawRainChart();
   drawTemperatureChart();
@@ -872,6 +873,69 @@ function renderFavorites() {
   }));
 }
 
+function createHomePlaceCard(place, isCurrent = false) {
+  const item = document.createElement('article');
+  item.className = 'home-place-row';
+
+  const icon = document.createElement('span');
+  icon.className = 'home-place-star';
+  icon.setAttribute('aria-hidden', 'true');
+  icon.textContent = isCurrent ? '●' : '☆';
+
+  const body = document.createElement('div');
+  const title = document.createElement('strong');
+  title.className = 'home-place-title';
+  title.textContent = place.name || place.location || 'Lagret sted';
+  const meta = document.createElement('span');
+  meta.className = 'home-place-meta';
+  meta.textContent = isCurrent ? 'Aktivt sted' : (place.label || 'Lagret favoritt');
+  body.append(title, meta);
+
+  if (isCurrent) {
+    const weather = document.createElement('span');
+    weather.className = 'home-place-weather';
+    weather.textContent = `${weatherState.current.icon || '🌤️'} ${Math.round(Number(weatherState.current.temperature) || 0)}°`;
+    item.append(icon, body, weather);
+    return item;
+  }
+
+  const button = document.createElement('button');
+  button.className = 'home-place-action';
+  button.type = 'button';
+  button.textContent = 'Vis';
+  button.dataset.homePlace = 'true';
+  button.dataset.id = place.id || '';
+  button.dataset.name = place.name || place.location || 'Lagret sted';
+  button.dataset.lat = String(place.lat ?? '');
+  button.dataset.lon = String(place.lon ?? '');
+  button.dataset.source = place.source || 'search';
+  button.dataset.searchQuery = place.searchQuery || place.name || '';
+  item.append(icon, body, button);
+  return item;
+}
+
+function renderHomePlaces() {
+  const list = document.querySelector('#home-places-list');
+  if (!list) return;
+
+  const favorites = getFavorites()
+    .filter((favorite) => favorite.id !== weatherState.location.id)
+    .slice(0, 4);
+  const rows = [
+    createHomePlaceCard(weatherState.location, true),
+    ...favorites.map((favorite) => createHomePlaceCard(favorite, false)),
+  ];
+
+  if (favorites.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'empty-state';
+    empty.textContent = 'Trykk Lagre på aktivt sted for å bygge din egen lille værforside.';
+    rows.push(empty);
+  }
+
+  list.replaceChildren(...rows);
+}
+
 function getFavorites() {
   try {
     const favorites = JSON.parse(localStorage.getItem(favoritesStorageKey) || '[]');
@@ -885,6 +949,7 @@ function saveFavorites(favorites) {
   localStorage.setItem(favoritesStorageKey, JSON.stringify(favorites));
   renderWeatherMeta();
   renderFavorites();
+  renderHomePlaces();
 }
 
 function toggleCurrentLocationFavorite() {
@@ -925,6 +990,36 @@ function bindFavorites() {
       const id = button.dataset.removeFavorite;
       saveFavorites(getFavorites().filter((favorite) => favorite.id !== id));
       showToast('Favoritt fjernet.');
+    });
+  }
+
+  const homePlacesList = document.querySelector('#home-places-list');
+  if (homePlacesList) {
+    homePlacesList.addEventListener('click', async (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      const button = target.closest('[data-home-place]');
+      if (!(button instanceof HTMLElement)) return;
+
+      const lat = Number(button.dataset.lat);
+      const lon = Number(button.dataset.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+        showToast('Favoritten mangler koordinater.');
+        return;
+      }
+
+      button.textContent = 'Henter';
+      await setActiveLocation({
+        id: button.dataset.id || `fav-${lat.toFixed(4)}-${lon.toFixed(4)}`,
+        name: button.dataset.name || 'Lagret sted',
+        lat,
+        lon,
+        source: button.dataset.source || 'search',
+        searchQuery: button.dataset.searchQuery || button.dataset.name || '',
+      });
+      button.textContent = 'Vis';
+      showToast(`Viser ${button.dataset.name || 'favoritten'}.`);
     });
   }
 }
@@ -1269,6 +1364,7 @@ async function initApp() {
   bindBathingPlaceSuggestion();
   bindFavorites();
   renderFavorites();
+  renderHomePlaces();
   await loadWeather();
   const usedPosition = await useBrowserLocationForWeather();
   if (!usedPosition) {

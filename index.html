@@ -143,6 +143,15 @@
           <p id="bathing-description" class="vv-soft mt-2 text-sm leading-relaxed">Vi sjekker luft, vind og nedbør før vi gir badevær-vurdering.</p>
           <div id="bathing-metrics" class="bathing-metrics mt-4"></div>
           <p id="bathing-source" class="vv-muted mt-3 text-xs">Beregnes fra MET-varsel.</p>
+          <form id="bathing-search-form" class="bathing-search mt-4" role="search">
+            <label class="field-label" for="bathing-search-input">Søk badetemperatur</label>
+            <div class="location-search">
+              <input id="bathing-search-input" class="form-field" autocomplete="off" maxlength="80" placeholder="Søk badeplass, f.eks. Bystranda">
+              <button class="primary-button" type="submit">Søk</button>
+            </div>
+            <p id="bathing-search-status" class="vv-muted mt-2 text-xs">Finn ferske badetemperaturer fra Yr uten å endre resten av appen.</p>
+          </form>
+          <div id="bathing-search-results" class="bathing-search-results hidden-view" aria-live="polite"></div>
           <button id="bathing-report-button" class="vv-btn-ghost mt-4 flex min-h-11 w-full items-center justify-center gap-2 text-sm font-semibold" type="button">Foreslå badeplass til Yr</button>
           <form id="bathing-place-form" class="bathing-place-form hidden-view" autocomplete="on">
             <div>
@@ -277,8 +286,8 @@
       <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
     </div>
 
-    <script src="vendor/leaflet/leaflet.js?v=20260611-bathplaces1" defer></script>
-    <script src="app.js?v=20260611-bathplaces1" defer></script>
-    <script src="script.js?v=20260611-bathplaces1" defer></script>
+    <script src="vendor/leaflet/leaflet.js?v=20260611-bathsearch1" defer></script>
+    <script src="app.js?v=20260611-bathsearch1" defer></script>
+    <script src="script.js?v=20260611-bathsearch1" defer></script>
   </body>
 </html>

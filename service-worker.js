@@ -1,5 +1,5 @@
-const CACHE_NAME = 'vaervakt-2026-v15';
-const ASSET_VERSION = '20260611-bathplaces1';
+const CACHE_NAME = 'vaervakt-2026-v16';
+const ASSET_VERSION = '20260611-bathsearch1';
 const PRECACHE_URLS = [
   './',
   './index.html',

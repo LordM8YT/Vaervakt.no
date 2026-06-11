@@ -598,6 +598,65 @@ html {
   line-height: 1.1;
 }
 
+.bathing-search {
+  border: 1px solid rgba(119, 200, 255, 0.12);
+  border-radius: 1.25rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.bathing-search-results {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+}
+
+.bathing-search-results.hidden-view {
+  display: none;
+}
+
+.bathing-result-card {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 1rem;
+  padding: 0.85rem;
+  background: rgba(2, 6, 23, 0.28);
+}
+
+.bathing-result-name {
+  display: block;
+  color: var(--vv-text);
+  font-size: 0.95rem;
+  font-weight: 850;
+}
+
+.bathing-result-meta {
+  margin-top: 0.2rem;
+  color: var(--vv-text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.bathing-result-temp {
+  color: #5eead4;
+  font-size: 1.55rem;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.bathing-result-action {
+  grid-column: 1 / -1;
+  min-height: 2.55rem;
+  border-radius: 0.85rem;
+  background: rgba(119, 200, 255, 0.12);
+  color: #cdefff;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
 .vv-btn-ghost {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 1rem;

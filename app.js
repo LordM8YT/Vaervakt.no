@@ -88,6 +88,7 @@ const navItems = [
 const favoritesStorageKey = 'vaervakt_favorites';
 let weatherRequestSequence = 0;
 let reportsRequestSequence = 0;
+let bathingSearchRequestSequence = 0;
 
 function getActiveLocationKey() {
   return [
@@ -413,6 +414,161 @@ function renderBathingWeather() {
       return metric;
     }));
   }
+}
+
+function formatBathingResultTime(value) {
+  if (!value) return '';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  return new Intl.DateTimeFormat('nb-NO', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function createBathingResultCard(result) {
+  const card = document.createElement('article');
+  card.className = 'bathing-result-card';
+
+  const body = document.createElement('div');
+  const name = document.createElement('strong');
+  name.className = 'bathing-result-name';
+  name.textContent = result.name || 'Badeplass';
+
+  const meta = document.createElement('p');
+  meta.className = 'bathing-result-meta';
+  const metaParts = [
+    result.municipality,
+    Number.isFinite(Number(result.distanceKm)) ? `${Number(result.distanceKm).toFixed(1).replace('.', ',')} km unna` : '',
+    formatBathingResultTime(result.time),
+    result.heatedWater ? 'oppvarmet vann' : '',
+  ].filter(Boolean);
+  meta.textContent = metaParts.join(' · ') || result.credit || 'Badetemperaturer levert av Yr';
+
+  body.append(name, meta);
+
+  const temp = document.createElement('strong');
+  temp.className = 'bathing-result-temp';
+  temp.textContent = Number.isFinite(Number(result.waterTemperature))
+    ? `${Number(result.waterTemperature).toFixed(1).replace('.', ',')}°`
+    : '--';
+
+  const button = document.createElement('button');
+  button.className = 'bathing-result-action';
+  button.type = 'button';
+  button.textContent = 'Vis været her';
+  button.dataset.bathingSelect = 'true';
+  button.dataset.id = result.id || '';
+  button.dataset.name = [result.name, result.municipality].filter(Boolean).join(', ');
+  button.dataset.lat = String(result.lat ?? '');
+  button.dataset.lon = String(result.lon ?? '');
+
+  card.append(body, temp, button);
+  return card;
+}
+
+function renderBathingSearchResults(results, message = '') {
+  const list = document.querySelector('#bathing-search-results');
+  if (!list) return;
+
+  list.classList.remove('hidden-view');
+  if (!Array.isArray(results) || results.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'empty-state';
+    empty.textContent = message || 'Fant ingen ferske badetemperaturer for dette søket.';
+    list.replaceChildren(empty);
+    return;
+  }
+
+  list.replaceChildren(...results.map(createBathingResultCard));
+}
+
+function bindBathingTemperatureSearch() {
+  const form = document.querySelector('#bathing-search-form');
+  const input = document.querySelector('#bathing-search-input');
+  const status = document.querySelector('#bathing-search-status');
+  const results = document.querySelector('#bathing-search-results');
+  if (!form || !input) return;
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const query = input.value.trim();
+    if (query.length < 2) {
+      showToast('Skriv minst to tegn for å søke etter badeplass.');
+      return;
+    }
+
+    const requestId = ++bathingSearchRequestSequence;
+    const button = form.querySelector('button[type="submit"]');
+    const originalText = button?.textContent || 'Søk';
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Søker...';
+    }
+    if (status) status.textContent = `Søker etter badetemperatur for ${query}...`;
+
+    try {
+      const response = await fetch(`api/bathing-search.php?q=${encodeURIComponent(query)}`, {
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (requestId !== bathingSearchRequestSequence) return;
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.message || 'Kunne ikke søke etter badetemperatur.');
+      }
+
+      renderBathingSearchResults(payload.results || [], payload.message || '');
+      if (status) {
+        const count = Array.isArray(payload.results) ? payload.results.length : 0;
+        status.textContent = count > 0
+          ? `${count} treff fra Yr. Trykk “Vis været her” hvis du vil bruke badeplassen i hele appen.`
+          : (payload.message || 'Fant ingen ferske badetemperaturer.');
+      }
+    } catch (error) {
+      renderBathingSearchResults([], error.message || 'Kunne ikke søke etter badetemperatur.');
+      if (status) status.textContent = error.message || 'Kunne ikke søke etter badetemperatur.';
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalText;
+      }
+    }
+  });
+
+  results?.addEventListener('click', async (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    const button = target.closest('[data-bathing-select]');
+    if (!(button instanceof HTMLElement)) return;
+
+    const lat = Number(button.dataset.lat);
+    const lon = Number(button.dataset.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      showToast('Dette treffet mangler koordinater.');
+      return;
+    }
+
+    button.setAttribute('aria-busy', 'true');
+    button.textContent = 'Henter...';
+    await setActiveLocation({
+      id: button.dataset.id || `bath-${lat.toFixed(4)}-${lon.toFixed(4)}`,
+      name: button.dataset.name || 'Badeplass',
+      lat,
+      lon,
+      source: 'search',
+      searchQuery: button.dataset.name || '',
+    });
+    document.querySelector('#bathing-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    showToast(`Viser badevær for ${button.dataset.name || 'badeplassen'}.`);
+    button.removeAttribute('aria-busy');
+    button.textContent = 'Vis været her';
+  });
 }
 
 function renderWeatherExperience() {
@@ -1109,6 +1265,7 @@ async function initApp() {
   bindLocationSearch();
   bindWeatherLocation();
   bindReportForm();
+  bindBathingTemperatureSearch();
   bindBathingPlaceSuggestion();
   bindFavorites();
   renderFavorites();

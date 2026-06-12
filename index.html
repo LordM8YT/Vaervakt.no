@@ -8,9 +8,9 @@
     <meta name="vapid-public-key" content="">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="icons/vaervakt-icon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="vendor/leaflet/leaflet.css?v=20260611-ui2">
-    <link rel="stylesheet" href="tailwind.css?v=20260611-ui2">
-    <link rel="stylesheet" href="styles.css?v=20260611-ui2">
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css?v=20260612-hub1">
+    <link rel="stylesheet" href="tailwind.css?v=20260612-hub1">
+    <link rel="stylesheet" href="styles.css?v=20260612-hub1">
     <title>Værvakt 2026</title>
   </head>
   <body class="vaervakt-body">
@@ -26,6 +26,7 @@
         <div class="topbar-status" aria-label="Status">
           <span>MET</span>
           <span>Live rapporter</span>
+          <button id="settings-open-button" class="topbar-profile-button" type="button">Profil</button>
         </div>
       </header>
       <main class="app-main mx-auto flex w-full max-w-xl flex-col px-5">
@@ -220,6 +221,46 @@
           <div id="observations-list" class="flex flex-col gap-2"></div>
         </section>
 
+        <section id="hub-section" class="glass-card p-5" aria-labelledby="hub-title">
+          <div class="mb-5 flex items-start justify-between gap-4">
+            <div>
+              <p class="section-label">Lokal værhub</p>
+              <h2 id="hub-title" class="vv-text mt-2 text-xl font-bold">Spør, tips og lokale meldinger</h2>
+              <p id="hub-profile-status" class="vv-muted mt-2 text-xs">Logg inn med navn og PIN under Profil for å poste og stemme.</p>
+            </div>
+            <button id="hub-refresh-button" class="vv-btn-ghost px-3 py-2 text-xs font-bold" type="button">Oppdater</button>
+          </div>
+
+          <form id="hub-post-form" class="hub-post-form">
+            <div class="hub-form-grid">
+              <div>
+                <label class="field-label" for="hub-post-title">Tittel</label>
+                <input id="hub-post-title" class="form-field" name="title" maxlength="140" placeholder="Hva skjer med været hos deg?" required>
+              </div>
+              <div>
+                <label class="field-label" for="hub-post-category">Type</label>
+                <select id="hub-post-category" class="form-field" name="category">
+                  <option value="general">Innlegg</option>
+                  <option value="question">Spørsmål</option>
+                  <option value="warning">Varsel</option>
+                  <option value="tip">Tips</option>
+                  <option value="photo">Bilde/observasjon</option>
+                </select>
+              </div>
+            </div>
+            <label class="field-label" for="hub-post-body">Tekst</label>
+            <textarea id="hub-post-body" class="form-field form-textarea" name="body" maxlength="1200" placeholder="Skriv kort. F.eks. glatt vei, rare skyer, lokal byge, badetips eller spørsmål." required></textarea>
+            <p id="hub-post-location" class="vv-muted text-xs">Innlegget kobles til aktivt sted.</p>
+            <button class="primary-button w-full" type="submit">Publiser i Værhub</button>
+          </form>
+
+          <div class="hub-feed-toolbar">
+            <button class="hub-sort-button" type="button" data-hub-sort="new" data-active="true">Nyeste</button>
+            <button class="hub-sort-button" type="button" data-hub-sort="top">Topp</button>
+          </div>
+          <div id="hub-feed" class="hub-feed" aria-live="polite"></div>
+        </section>
+
         <section class="dashboard-panel panel-meteorologists" aria-labelledby="meteorologists-title">
           <div class="section-heading-row">
             <div>
@@ -330,6 +371,47 @@
           <p id="push-copy" class="vv-soft mt-3 text-sm leading-relaxed">Aktiver push-varsler for lokale væroppdateringer når VAPID-nøkkelen er satt.</p>
           <button id="push-action-button" class="primary-button mt-5" type="button">Aktiver varsler</button>
         </section>
+        <section class="app-view hidden-view glass-card p-5" data-view="settings" aria-labelledby="settings-title">
+          <p class="section-label">Innstillinger</p>
+          <h1 id="settings-title" class="vv-text mt-3 text-xl font-bold">Profil og personvern</h1>
+          <p class="vv-soft mt-3 text-sm leading-relaxed">
+            Værhub bruker bare visningsnavn og PIN. Ingen e-post, telefonnummer eller ekte brukerprofil kreves.
+          </p>
+
+          <article class="settings-card mt-5">
+            <p class="section-label">Aktiv profil</p>
+            <h2 id="hub-active-profile" class="vv-text mt-2 text-lg font-bold">Ikke logget inn</h2>
+            <p id="hub-active-profile-note" class="vv-muted mt-2 text-sm">Opprett eller logg inn for å poste og stemme i Værhub.</p>
+            <button id="hub-logout-button" class="vv-btn-ghost mt-4 hidden-view px-4 py-3 text-sm font-bold" type="button">Logg ut lokalt</button>
+          </article>
+
+          <form id="hub-auth-form" class="settings-card mt-4">
+            <div>
+              <label class="field-label" for="hub-auth-name">Navn</label>
+              <input id="hub-auth-name" class="form-field" name="displayName" autocomplete="nickname" maxlength="80" placeholder="For eksempel Patrick" required>
+            </div>
+            <div>
+              <label class="field-label" for="hub-auth-pin">PIN-kode</label>
+              <input id="hub-auth-pin" class="form-field" name="pin" type="password" inputmode="numeric" minlength="4" maxlength="32" placeholder="Minst 4 tegn" required>
+            </div>
+            <div class="hub-auth-actions">
+              <button class="primary-button" type="submit" data-hub-auth-action="login">Logg inn</button>
+              <button class="vv-btn-ghost px-4 py-3 text-sm font-bold" type="submit" data-hub-auth-action="register">Opprett profil</button>
+            </div>
+            <p class="vv-muted text-xs leading-relaxed">
+              PIN lagres kun som hash på serveren. Nettleseren lagrer en lokal token slik at du slipper å skrive PIN hver gang.
+            </p>
+          </form>
+
+          <article class="settings-card mt-4">
+            <p class="section-label">Dataflyt</p>
+            <p class="vv-soft mt-2 text-sm leading-relaxed">
+              Innlegg kobles til aktivt sted og dagens værsnapshot fra MET/Yr-visningen. Værhub henter ikke Yr-data på nytt.
+            </p>
+          </article>
+
+          <button id="settings-close-button" class="primary-button mt-5 w-full" type="button">Tilbake til appen</button>
+        </section>
       </main>
 
       <nav class="bottom-nav" aria-label="Hovednavigasjon">
@@ -339,8 +421,8 @@
       <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
     </div>
 
-    <script src="vendor/leaflet/leaflet.js?v=20260611-ui2" defer></script>
-    <script src="app.js?v=20260611-ui2" defer></script>
-    <script src="script.js?v=20260611-ui2" defer></script>
+    <script src="vendor/leaflet/leaflet.js?v=20260612-hub1" defer></script>
+    <script src="app.js?v=20260612-hub1" defer></script>
+    <script src="script.js?v=20260612-hub1" defer></script>
   </body>
 </html>

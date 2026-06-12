@@ -1865,3 +1865,141 @@ html,
     white-space: nowrap;
   }
 }
+
+.topbar-profile-button {
+  min-height: 2rem;
+  border: 1px solid var(--vv-border);
+  border-radius: 999px;
+  padding: 0 0.75rem;
+  background: rgba(15, 23, 42, 0.58);
+  color: var(--vv-text-soft);
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.hub-post-form,
+.settings-card {
+  display: grid;
+  gap: 0.85rem;
+  border: 1px solid var(--vv-border);
+  border-radius: var(--vv-radius);
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.46);
+}
+
+.hub-form-grid,
+.hub-auth-actions {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.hub-feed-toolbar {
+  display: flex;
+  gap: 0.55rem;
+  margin: 1rem 0 0.75rem;
+}
+
+.hub-sort-button {
+  min-height: 2.35rem;
+  border: 1px solid var(--vv-border);
+  border-radius: 999px;
+  padding: 0 0.9rem;
+  background: rgba(15, 23, 42, 0.52);
+  color: var(--vv-text-muted);
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.hub-sort-button[data-active="true"] {
+  border-color: rgba(125, 211, 252, 0.28);
+  background: rgba(14, 165, 233, 0.14);
+  color: var(--vv-accent);
+}
+
+.hub-feed {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.hub-post-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.8rem;
+  border: 1px solid var(--vv-border);
+  border-radius: var(--vv-radius);
+  padding: 0.9rem;
+  background: rgba(15, 23, 42, 0.52);
+}
+
+.hub-vote-box {
+  display: grid;
+  justify-items: center;
+  gap: 0.25rem;
+  min-width: 2.4rem;
+}
+
+.hub-vote-button {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--vv-border);
+  border-radius: 999px;
+  background: rgba(30, 41, 59, 0.72);
+  color: var(--vv-text-muted);
+  font-size: 0.75rem;
+  font-weight: 900;
+}
+
+.hub-vote-button[data-active="true"] {
+  border-color: rgba(125, 211, 252, 0.34);
+  background: rgba(14, 165, 233, 0.16);
+  color: var(--vv-accent);
+}
+
+.hub-score {
+  color: var(--vv-text);
+  font-size: 0.95rem;
+}
+
+.hub-post-body {
+  min-width: 0;
+}
+
+.hub-post-meta,
+.hub-post-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  color: var(--vv-text-muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.hub-post-title {
+  margin-top: 0.35rem;
+  color: var(--vv-text);
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.hub-post-text {
+  margin-top: 0.35rem;
+  color: var(--vv-text-soft);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.hub-post-footer {
+  margin-top: 0.65rem;
+}
+
+@media (min-width: 640px) {
+  .hub-form-grid,
+  .hub-auth-actions {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+  }
+}

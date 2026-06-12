@@ -73,6 +73,7 @@ const weatherState = {
   observations: [
     { icon: '⏳', time: 'Laster', reporter: 'Henter observasjoner', condition: 'Kobler til databasen', temp: 0 },
   ],
+  hubPosts: [],
   map: null,
   mapMarkers: [],
 };
@@ -86,9 +87,13 @@ const navItems = [
 ];
 
 const favoritesStorageKey = 'vaervakt_favorites';
+const hubIdentityStorageKey = 'vaervakt_hub_identity';
+const hubVotesStorageKey = 'vaervakt_hub_votes';
 let weatherRequestSequence = 0;
 let reportsRequestSequence = 0;
 let bathingSearchRequestSequence = 0;
+let hubRequestSequence = 0;
+let hubSort = 'new';
 
 function getActiveLocationKey() {
   return [
@@ -627,6 +632,7 @@ async function loadWeather() {
   renderCurrentWeather();
   renderWeatherMeta();
   renderHomePlaces();
+  renderHubProfileState();
   renderWeatherExperience();
   drawRainChart();
   drawTemperatureChart();
@@ -750,6 +756,7 @@ function setActiveNavItem(activeId) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
   if (activeId === 'map') renderMapView();
   if (activeId === 'favorites') renderFavorites();
+  if (activeId === 'settings') renderHubProfileState();
 }
 
 function renderMapList() {
@@ -1082,7 +1089,7 @@ async function setActiveLocation(location) {
   };
   renderCurrentWeather();
   renderWeatherMeta();
-  await Promise.all([loadWeather(), loadReports()]);
+  await Promise.all([loadWeather(), loadReports(), loadHubPosts()]);
 }
 
 function bindWeatherLocation() {
@@ -1305,6 +1312,371 @@ function bindBathingPlaceSuggestion() {
   });
 }
 
+function getHubIdentity() {
+  try {
+    const identity = JSON.parse(localStorage.getItem(hubIdentityStorageKey) || 'null');
+    if (!identity || !identity.user || !identity.authToken) return null;
+    if (!Number.isFinite(Number(identity.user.id))) return null;
+    return identity;
+  } catch {
+    return null;
+  }
+}
+
+function saveHubIdentity(identity) {
+  localStorage.setItem(hubIdentityStorageKey, JSON.stringify(identity));
+  renderHubProfileState();
+}
+
+function clearHubIdentity() {
+  localStorage.removeItem(hubIdentityStorageKey);
+  renderHubProfileState();
+}
+
+function getHubVoteMemory() {
+  try {
+    const votes = JSON.parse(localStorage.getItem(hubVotesStorageKey) || '{}');
+    return votes && typeof votes === 'object' ? votes : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveHubVoteMemory(votes) {
+  localStorage.setItem(hubVotesStorageKey, JSON.stringify(votes));
+}
+
+function getHubAuthPayload() {
+  const identity = getHubIdentity();
+  if (!identity) return null;
+  return {
+    userId: Number(identity.user.id),
+    authToken: identity.authToken,
+  };
+}
+
+function getHubCategoryLabel(category) {
+  const labels = {
+    general: 'Innlegg',
+    question: 'Spørsmål',
+    warning: 'Varsel',
+    tip: 'Tips',
+    photo: 'Observasjon',
+  };
+  return labels[category] || labels.general;
+}
+
+function renderHubProfileState() {
+  const identity = getHubIdentity();
+  const status = document.querySelector('#hub-profile-status');
+  const activeProfile = document.querySelector('#hub-active-profile');
+  const activeProfileNote = document.querySelector('#hub-active-profile-note');
+  const logoutButton = document.querySelector('#hub-logout-button');
+  const location = document.querySelector('#hub-post-location');
+  const settingsButton = document.querySelector('#settings-open-button');
+
+  if (status) {
+    status.textContent = identity
+      ? `Poster som ${identity.user.displayName}.`
+      : 'Logg inn med navn og PIN under Profil for å poste og stemme.';
+  }
+  if (activeProfile) {
+    activeProfile.textContent = identity ? identity.user.displayName : 'Ikke logget inn';
+  }
+  if (activeProfileNote) {
+    activeProfileNote.textContent = identity
+      ? 'Denne profilen er kun lagret lokalt i nettleseren med en server-token.'
+      : 'Opprett eller logg inn for å poste og stemme i Værhub.';
+  }
+  if (logoutButton) {
+    logoutButton.classList.toggle('hidden-view', !identity);
+  }
+  if (settingsButton) {
+    settingsButton.textContent = identity ? identity.user.displayName : 'Profil';
+  }
+  if (location) {
+    const temp = Math.round(Number(weatherState.current?.temperature ?? 0));
+    const condition = weatherState.current?.condition || 'Ukjent vær';
+    location.textContent = `Kobles til ${weatherState.location.name} · ${condition} · ${temp}°`;
+  }
+}
+
+function createHubPostElement(post) {
+  const votes = getHubVoteMemory();
+  const myVote = Number(votes[String(post.id)] || 0);
+  const card = document.createElement('article');
+  card.className = 'hub-post-card';
+  card.dataset.postId = String(post.id);
+  const temperature = Number.isFinite(Number(post.temperature)) ? `${Math.round(Number(post.temperature))}°` : '';
+  const weather = [post.weatherCondition, temperature].filter(Boolean).join(' · ');
+  card.innerHTML = `
+    <div class="hub-vote-box">
+      <button class="hub-vote-button" type="button" data-hub-vote="1" data-active="${myVote === 1}" aria-label="Stem opp">▲</button>
+      <strong class="hub-score">${Number(post.score) || 0}</strong>
+      <button class="hub-vote-button" type="button" data-hub-vote="-1" data-active="${myVote === -1}" aria-label="Stem ned">▼</button>
+    </div>
+    <div class="hub-post-body">
+      <div class="hub-post-meta">
+        <span>${escapeHtml(getHubCategoryLabel(post.category))}</span>
+        <span>${escapeHtml(post.location || 'Ukjent sted')}</span>
+        <span>${escapeHtml(post.time || 'Nylig')}</span>
+      </div>
+      <h3 class="hub-post-title">${escapeHtml(post.title)}</h3>
+      <p class="hub-post-text">${escapeHtml(post.body)}</p>
+      <div class="hub-post-footer">
+        <span>av ${escapeHtml(post.displayName || 'Anonym værvakt')}</span>
+        <span>${escapeHtml(weather || 'Ingen værsnapshot')}</span>
+      </div>
+    </div>
+  `;
+  return card;
+}
+
+function renderHubFeed() {
+  const feed = document.querySelector('#hub-feed');
+  if (!feed) return;
+
+  if (!weatherState.hubPosts.length) {
+    const empty = document.createElement('p');
+    empty.className = 'empty-state';
+    empty.textContent = `Ingen lokale hub-innlegg nær ${weatherState.location.name} ennå.`;
+    feed.replaceChildren(empty);
+    return;
+  }
+
+  feed.replaceChildren(...weatherState.hubPosts.map(createHubPostElement));
+}
+
+async function loadHubPosts() {
+  const requestId = ++hubRequestSequence;
+  const locationKey = getActiveLocationKey();
+
+  try {
+    const params = new URLSearchParams({ limit: '20', sort: hubSort });
+    const hasCoords = Number.isFinite(Number(weatherState.location.lat)) && Number.isFinite(Number(weatherState.location.lon));
+    if (hasCoords) {
+      params.set('lat', String(weatherState.location.lat));
+      params.set('lon', String(weatherState.location.lon));
+      params.set('radiusKm', weatherState.location.source === 'user' ? '15' : '25');
+    }
+    if (weatherState.location.source === 'search') {
+      params.set('location', weatherState.location.searchQuery || weatherState.location.name);
+    } else if (weatherState.location.source === 'default') {
+      params.set('location', weatherState.location.name);
+    }
+
+    const response = await fetch(`api/hub.php?${params.toString()}`, {
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.message || 'Kunne ikke hente Værhub');
+    }
+    if (requestId !== hubRequestSequence || locationKey !== getActiveLocationKey()) {
+      return;
+    }
+    weatherState.hubPosts = Array.isArray(payload.posts) ? payload.posts : [];
+  } catch (error) {
+    if (requestId !== hubRequestSequence || locationKey !== getActiveLocationKey()) {
+      return;
+    }
+    console.warn('Kunne ikke hente Værhub:', error);
+    weatherState.hubPosts = [];
+  }
+
+  renderHubFeed();
+}
+
+function bindHub() {
+  const form = document.querySelector('#hub-post-form');
+  const refreshButton = document.querySelector('#hub-refresh-button');
+  const feed = document.querySelector('#hub-feed');
+
+  if (refreshButton) {
+    refreshButton.addEventListener('click', async () => {
+      refreshButton.disabled = true;
+      await loadHubPosts();
+      refreshButton.disabled = false;
+      showToast('Værhub oppdatert.');
+    });
+  }
+
+  document.querySelectorAll('[data-hub-sort]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      hubSort = button.dataset.hubSort || 'new';
+      document.querySelectorAll('[data-hub-sort]').forEach((item) => {
+        item.dataset.active = String(item === button);
+      });
+      await loadHubPosts();
+    });
+  });
+
+  if (form) {
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const auth = getHubAuthPayload();
+      if (!auth) {
+        showToast('Logg inn med navn og PIN først.');
+        setActiveNavItem('settings');
+        return;
+      }
+
+      const submitButton = form.querySelector('button[type="submit"]');
+      const data = Object.fromEntries(new FormData(form).entries());
+      const payload = {
+        ...auth,
+        title: data.title,
+        category: data.category || 'general',
+        body: data.body,
+        location: weatherState.location.name,
+        lat: weatherState.location.lat,
+        lon: weatherState.location.lon,
+        weatherCondition: weatherState.current?.condition || '',
+        temperature: weatherState.current?.temperature ?? null,
+      };
+
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.dataset.originalText = submitButton.textContent || 'Publiser';
+        submitButton.textContent = 'Publiserer...';
+      }
+
+      try {
+        const response = await fetch('api/hub.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result.success) {
+          throw new Error(result.message || 'Kunne ikke publisere innlegget.');
+        }
+        navigator.vibrate?.(10);
+        form.reset();
+        showToast(result.duplicate ? 'Innlegget var allerede sendt.' : 'Innlegg publisert i Værhub.');
+        await loadHubPosts();
+      } catch (error) {
+        showToast(error.message || 'Kunne ikke publisere innlegget.');
+      } finally {
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.textContent = submitButton.dataset.originalText || 'Publiser i Værhub';
+          delete submitButton.dataset.originalText;
+        }
+      }
+    });
+  }
+
+  if (feed) {
+    feed.addEventListener('click', async (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const button = target.closest('[data-hub-vote]');
+      if (!(button instanceof HTMLElement)) return;
+
+      const auth = getHubAuthPayload();
+      if (!auth) {
+        showToast('Logg inn med navn og PIN for å stemme.');
+        setActiveNavItem('settings');
+        return;
+      }
+
+      const card = button.closest('[data-post-id]');
+      const postId = Number(card?.dataset.postId);
+      const vote = Number(button.dataset.hubVote);
+      if (!Number.isFinite(postId) || ![-1, 1].includes(vote)) return;
+
+      const votes = getHubVoteMemory();
+      const currentVote = Number(votes[String(postId)] || 0);
+      const nextVote = currentVote === vote ? 0 : vote;
+
+      button.setAttribute('aria-busy', 'true');
+      try {
+        const response = await fetch('api/hub.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ ...auth, action: 'vote', postId, vote: nextVote }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result.success) {
+          throw new Error(result.message || 'Kunne ikke lagre stemmen.');
+        }
+        if (nextVote === 0) {
+          delete votes[String(postId)];
+        } else {
+          votes[String(postId)] = nextVote;
+        }
+        saveHubVoteMemory(votes);
+
+        const post = weatherState.hubPosts.find((item) => Number(item.id) === postId);
+        if (post) {
+          post.score = result.score;
+          post.voteCount = result.voteCount;
+        }
+        renderHubFeed();
+      } catch (error) {
+        showToast(error.message || 'Kunne ikke stemme akkurat nå.');
+      } finally {
+        button.removeAttribute('aria-busy');
+      }
+    });
+  }
+}
+
+function bindSettings() {
+  const openButton = document.querySelector('#settings-open-button');
+  const closeButton = document.querySelector('#settings-close-button');
+  const logoutButton = document.querySelector('#hub-logout-button');
+  const form = document.querySelector('#hub-auth-form');
+
+  if (openButton) {
+    openButton.addEventListener('click', () => setActiveNavItem('settings'));
+  }
+  if (closeButton) {
+    closeButton.addEventListener('click', () => setActiveNavItem('home'));
+  }
+  if (logoutButton) {
+    logoutButton.addEventListener('click', () => {
+      clearHubIdentity();
+      showToast('Du er logget ut lokalt.');
+    });
+  }
+
+  if (form) {
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const submitter = event.submitter instanceof HTMLElement ? event.submitter : document.activeElement;
+      const action = submitter instanceof HTMLElement && submitter.dataset.hubAuthAction === 'register' ? 'register' : 'login';
+      const data = Object.fromEntries(new FormData(form).entries());
+      const buttons = Array.from(form.querySelectorAll('button'));
+
+      buttons.forEach((button) => { button.disabled = true; });
+      try {
+        const response = await fetch('api/hub.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ action, displayName: data.displayName, pin: data.pin }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result.success || !result.user || !result.authToken) {
+          throw new Error(result.message || 'Kunne ikke logge inn.');
+        }
+        saveHubIdentity({ user: result.user, authToken: result.authToken });
+        form.reset();
+        showToast(result.message || 'Profilen er klar.');
+        setActiveNavItem('home');
+      } catch (error) {
+        showToast(error.message || 'Kunne ikke lagre profilen.');
+      } finally {
+        buttons.forEach((button) => { button.disabled = false; });
+      }
+    });
+  }
+
+  renderHubProfileState();
+}
+
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;',
@@ -1362,13 +1734,15 @@ async function initApp() {
   bindReportForm();
   bindBathingTemperatureSearch();
   bindBathingPlaceSuggestion();
+  bindHub();
+  bindSettings();
   bindFavorites();
   renderFavorites();
   renderHomePlaces();
   await loadWeather();
   const usedPosition = await useBrowserLocationForWeather();
   if (!usedPosition) {
-    await loadReports();
+    await Promise.all([loadReports(), loadHubPosts()]);
   }
   window.setInterval(updateClock, 30_000);
 }

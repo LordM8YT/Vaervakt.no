@@ -7,7 +7,29 @@
     <meta name="description" content="Værvakt.no er en lokal værapp med MET-varsel, rapporter fra folk i nærheten og en enkel værhub.">
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="/assets/css/app.css?v=20260620-v2f">
+    <link rel="stylesheet" href="/assets/css/app.css?v=20260620-v2g">
+    <style id="critical-desktop-centering">
+      @media (min-width: 760px) {
+        .app-shell {
+          width: min(430px, calc(100% - 48px)) !important;
+          max-width: 430px !important;
+          margin-left: auto !important;
+          margin-right: auto !important;
+        }
+
+        .bottom-nav,
+        .toast,
+        .app-shell::before {
+          left: 50% !important;
+          right: auto !important;
+          transform: translateX(-50%) !important;
+        }
+
+        .toast.is-visible {
+          transform: translateX(-50%) translateY(0) !important;
+        }
+      }
+    </style>
     <title>Værvakt.no</title>
   </head>
   <body>
@@ -167,6 +189,6 @@
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
     </div>
 
-    <script src="/assets/js/app.js?v=20260620-v2f" defer></script>
+    <script src="/assets/js/app.js?v=20260620-v2g" defer></script>
   </body>
 </html>

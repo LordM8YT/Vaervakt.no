@@ -1,9 +1,9 @@
-const CACHE_NAME = 'vaervakt-v2-20260620-f';
+const CACHE_NAME = 'vaervakt-v2-20260620-g';
 const ASSETS = [
   '/',
   '/index.html',
-  '/assets/css/app.css?v=20260620-v2f',
-  '/assets/js/app.js?v=20260620-v2f',
+  '/assets/css/app.css?v=20260620-v2g',
+  '/assets/js/app.js?v=20260620-v2g',
   '/assets/icon.svg',
   '/manifest.json'
 ];

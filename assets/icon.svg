@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Værvakt">
+  <defs>
+    <linearGradient id="bg" x1="96" y1="64" x2="416" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38bdf8"/>
+      <stop offset="0.55" stop-color="#4f46e5"/>
+      <stop offset="1" stop-color="#020617"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="120" fill="url(#bg)"/>
+  <circle cx="190" cy="186" r="74" fill="#facc15"/>
+  <path fill="#f8fafc" d="M165 334c-43 0-78-35-78-78 0-39 29-72 67-77 20-43 64-73 115-73 70 0 127 57 127 127v5c33 10 57 41 57 77 0 44-36 80-80 80H165z"/>
+  <path fill="#38bdf8" d="M180 420c-10 0-18-8-18-18 0-4 1-7 3-10l30-52a18 18 0 0 1 31 18l-30 52c-3 6-9 10-16 10zm92 0c-10 0-18-8-18-18 0-4 1-7 3-10l30-52a18 18 0 0 1 31 18l-30 52c-3 6-9 10-16 10z"/>
+</svg>

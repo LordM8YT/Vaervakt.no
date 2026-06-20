@@ -405,7 +405,7 @@ textarea::placeholder {
 .bottom-nav {
   position: fixed;
   z-index: 30;
-  left: 50vw;
+  left: 50%;
   bottom: max(14px, env(safe-area-inset-bottom));
   width: min(100% - 28px, 430px);
   transform: translateX(-50%);
@@ -436,7 +436,7 @@ textarea::placeholder {
 .toast {
   position: fixed;
   z-index: 40;
-  left: 50vw;
+  left: 50%;
   bottom: calc(94px + env(safe-area-inset-bottom));
   max-width: min(100% - 32px, 420px);
   transform: translateX(-50%) translateY(18px);
@@ -476,9 +476,8 @@ textarea::placeholder {
   }
 
   .app-shell {
-    width: min(430px, calc(100vw - 48px));
-    margin-left: calc((100vw - min(430px, calc(100vw - 48px))) / 2);
-    margin-right: 0;
+    width: min(430px, calc(100% - 48px));
+    margin: 0 auto;
     padding-top: 28px;
   }
 
@@ -488,7 +487,7 @@ textarea::placeholder {
     z-index: -1;
     top: 22px;
     bottom: 22px;
-    left: 50vw;
+    left: 50%;
     width: min(470px, calc(100% - 28px));
     transform: translateX(-50%);
     border: 1px solid rgba(226, 232, 240, 0.08);

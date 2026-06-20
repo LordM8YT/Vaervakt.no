@@ -1,11 +1,12 @@
-const CACHE_NAME = 'vaervakt-v2-20260620-g';
+const CACHE_NAME = 'vaervakt-v2-20260620-h';
 const ASSETS = [
   '/',
   '/index.html',
-  '/assets/css/app.css?v=20260620-v2g',
-  '/assets/js/app.js?v=20260620-v2g',
+  '/assets/css/app.css?v=20260620-v2h',
+  '/assets/js/app.js?v=20260620-v2h',
   '/assets/icon.svg',
-  '/manifest.json'
+  '/manifest.json',
+  '/refresh.html'
 ];
 
 self.addEventListener('install', (event) => {

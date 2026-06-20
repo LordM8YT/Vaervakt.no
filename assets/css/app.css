@@ -63,9 +63,9 @@ button {
 .app-shell {
   min-height: 100svh;
   position: relative;
-  width: min(100%, 460px);
+  width: min(430px, calc(100% - 28px));
   margin: 0 auto;
-  padding: max(14px, env(safe-area-inset-top)) 14px calc(104px + env(safe-area-inset-bottom));
+  padding: max(14px, env(safe-area-inset-top)) 0 calc(104px + env(safe-area-inset-bottom));
 }
 
 .topbar {
@@ -476,7 +476,8 @@ textarea::placeholder {
   }
 
   .app-shell {
-    width: min(430px, calc(100% - 48px));
+    width: min(430px, calc(100% - 28px));
+    max-width: 430px;
     margin: 0 auto;
     padding-top: 28px;
   }

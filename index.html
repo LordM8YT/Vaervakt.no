@@ -2,427 +2,67 @@
 <html lang="nb">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#0f172a">
-    <meta name="description" content="Værvakt 2026 viser lokal værpuls, observasjoner og push-varsler i en frittstående PWA.">
-    <meta name="vapid-public-key" content="">
-    <link rel="manifest" href="manifest.json">
-    <link rel="icon" href="icons/vaervakt-icon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="vendor/leaflet/leaflet.css?v=20260612-hub1">
-    <link rel="stylesheet" href="tailwind.css?v=20260612-hub1">
-    <link rel="stylesheet" href="styles.css?v=20260612-hub1">
-    <title>Værvakt 2026</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#020617">
+    <title>Værvakt.no</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #020617;
+        color: #e2e8f0;
+      }
+
+      body {
+        min-height: 100svh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background:
+          radial-gradient(circle at 20% 15%, rgba(56, 189, 248, 0.18), transparent 30%),
+          radial-gradient(circle at 82% 20%, rgba(99, 102, 241, 0.16), transparent 28%),
+          linear-gradient(180deg, #0f172a 0%, #020617 100%);
+      }
+
+      main {
+        width: min(100%, 520px);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 32px;
+        padding: clamp(28px, 7vw, 48px);
+        background: rgba(15, 23, 42, 0.76);
+        box-shadow: 0 28px 80px rgba(2, 6, 23, 0.45);
+        text-align: center;
+      }
+
+      p {
+        margin: 0;
+        color: #94a3b8;
+        line-height: 1.7;
+      }
+
+      .eyebrow {
+        color: #7dd3fc;
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 16px 0 12px;
+        color: #f8fafc;
+        font-size: clamp(2.4rem, 12vw, 4.8rem);
+        line-height: 0.95;
+        letter-spacing: -0.08em;
+      }
+    </style>
   </head>
-  <body class="vaervakt-body">
-    <div id="root" class="app-root relative">
-      <header class="app-topbar">
-        <a class="brand-lockup" href="/" aria-label="Værvakt hjem">
-          <span class="brand-mark" aria-hidden="true">V</span>
-          <span>
-            <strong>Værvakt</strong>
-            <small>2026</small>
-          </span>
-        </a>
-        <div class="topbar-status" aria-label="Status">
-          <span>MET</span>
-          <span>Live rapporter</span>
-          <button id="settings-open-button" class="topbar-profile-button" type="button">Profil</button>
-        </div>
-      </header>
-      <main class="app-main mx-auto flex w-full max-w-xl flex-col px-5">
-        <div class="app-view flex flex-col gap-8" data-view="home">
-        <section aria-labelledby="current-weather-title" class="hero-panel pt-2">
-          <div class="mb-6">
-            <p id="current-weather-title" class="vv-text text-base font-bold">Kristiansand, NO</p>
-            <p id="location-source" class="vv-muted mt-1 text-sm">Standarddata fra Kristiansand. Del posisjon eller søk etter sted.</p>
-            <p id="clock" class="vv-muted mt-1 text-sm">--:--</p>
-          </div>
-
-          <div class="flex items-start gap-2">
-            <span id="temperature" class="weather-temp vv-text">21</span>
-            <span class="weather-unit vv-text">°C</span>
-          </div>
-
-          <p class="vv-muted mt-3 text-base">
-            Kjennes som
-            <span id="feels-like" class="vv-soft font-semibold">21°C</span>
-            <span id="weather-condition" class="vv-soft ml-2 font-semibold">Lettskyet</span>
-          </p>
-          <div class="weather-meta-grid mt-5">
-            <div class="weather-meta-card">
-              <span class="weather-meta-label">UV</span>
-              <strong id="uv-index" class="weather-meta-value">--</strong>
-              <span id="uv-status" class="weather-meta-note">Henter</span>
-            </div>
-            <button id="favorite-location-button" class="weather-meta-card weather-meta-button" type="button">
-              <span class="weather-meta-label">Favoritt</span>
-              <strong class="weather-meta-value">Lagre</strong>
-              <span class="weather-meta-note">Kristiansand</span>
-            </button>
-            <button id="weather-position-button" class="weather-meta-card weather-meta-button" type="button">
-              <span class="weather-meta-label">Posisjon</span>
-              <strong class="weather-meta-value">Bruk min</strong>
-              <span class="weather-meta-note">Oppdater varsel</span>
-            </button>
-          </div>
-          <form id="location-search-form" class="location-search mt-4" role="search">
-            <label class="sr-only" for="location-search-input">Søk etter sted</label>
-            <input id="location-search-input" class="form-field" autocomplete="address-level2" maxlength="80" placeholder="Søk sted, f.eks. Bergen eller Tromsø">
-            <button class="primary-button" type="submit">Søk</button>
-          </form>
-          <p id="location-search-status" class="vv-muted mt-2 text-xs">Søk eller del posisjon for lokale MET-data og rapporter.</p>
-
-          <article class="weather-summary-card mt-5">
-            <div>
-              <p class="section-label">Akkurat nå</p>
-              <h2 id="weather-summary-headline" class="vv-text mt-2 text-xl font-bold">Rolig værbilde</h2>
-              <p id="weather-summary-detail" class="vv-soft mt-2 text-sm leading-relaxed">Værvakt kombinerer MET-varsel med lokale rapporter når de finnes.</p>
-            </div>
-            <span id="weather-hero-icon" class="weather-hero-icon" aria-hidden="true">🌤️</span>
-          </article>
-
-          <div id="weather-insights" class="weather-insights-grid mt-3" aria-label="Værdetaljer"></div>
-        </section>
-
-        <div class="vv-divider" role="presentation"></div>
-
-        <section class="dashboard-panel panel-places" aria-labelledby="home-places-title">
-          <div class="section-heading-row">
-            <div>
-              <p class="section-label">Mine steder</p>
-              <h2 id="home-places-title" class="vv-text mt-2 text-xl font-bold">Lokale værsteder</h2>
-            </div>
-            <span class="section-chip">Live</span>
-          </div>
-          <div id="home-places-list" class="home-places-list mt-5"></div>
-        </section>
-
-        <div class="vv-divider" role="presentation"></div>
-
-        <section class="dashboard-panel panel-rain" aria-labelledby="rain-title">
-          <div class="mb-4 flex items-center justify-between gap-4">
-            <div class="flex items-center gap-2">
-              <span aria-hidden="true" class="text-lg">🌧</span>
-              <h2 id="rain-title" class="vv-text text-base font-bold">Nedbør neste 6 timer</h2>
-            </div>
-            <p id="rain-summary" class="vv-muted text-right text-xs font-semibold">Ingen nedbør forventet</p>
-          </div>
-
-          <div class="chart-panel">
-            <svg id="rain-chart" class="h-full w-full" viewBox="0 0 500 144" role="img" aria-label="Nedbørsgraf for de neste seks timene"></svg>
-          </div>
-
-          <div class="mt-2 flex gap-5">
-            <div class="flex items-center gap-2">
-              <span class="legend-block legend-rain" aria-hidden="true"></span>
-              <span class="vv-muted text-xs">Mengde (mm)</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="legend-line legend-probability" aria-hidden="true"></span>
-              <span class="vv-muted text-xs">Sannsynlighet (%)</span>
-            </div>
-          </div>
-        </section>
-
-        <div class="vv-divider" role="presentation"></div>
-
-        <section class="dashboard-panel panel-temperature" aria-labelledby="temp-title">
-          <h2 id="temp-title" class="vv-text mb-4 text-base font-bold">Dagens temperatur</h2>
-          <div class="chart-panel chart-panel--short">
-            <svg id="temperature-chart" class="h-full w-full" viewBox="0 0 500 128" role="img" aria-label="Temperaturgraf for kvelden"></svg>
-          </div>
-        </section>
-
-        <div class="vv-divider" role="presentation"></div>
-
-        <section class="dashboard-panel panel-wide" aria-labelledby="hourly-title">
-          <div class="mb-4 flex items-center justify-between gap-4">
-            <h2 id="hourly-title" class="vv-text text-base font-bold">Neste timer</h2>
-            <p class="vv-muted text-right text-xs font-semibold">Time for time</p>
-          </div>
-          <div id="hourly-list" class="hourly-strip" aria-label="Time-for-time varsel"></div>
-        </section>
-
-        <div class="vv-divider" role="presentation"></div>
-
-        <section class="dashboard-panel" aria-labelledby="forecast-title">
-          <h2 id="forecast-title" class="vv-text mb-4 text-base font-bold">5-dagers varsel</h2>
-          <div id="forecast-list" class="flex flex-col gap-1"></div>
-        </section>
-
-        <div class="vv-divider" role="presentation"></div>
-
-        <section id="bathing-section" class="glass-card bathing-card p-5" aria-labelledby="bathing-title">
-          <div class="bathing-head">
-            <div>
-              <p class="section-label">Sommermodus</p>
-              <h2 id="bathing-title" class="vv-text mt-3 text-xl font-bold">Badevær</h2>
-            </div>
-            <span id="bathing-emoji" class="bathing-emoji" aria-hidden="true">🌊</span>
-          </div>
-          <div class="bathing-score-wrap mt-4">
-            <div class="bathing-score-track" aria-hidden="true">
-              <span id="bathing-score-fill" class="bathing-score-fill"></span>
-            </div>
-            <strong id="bathing-score" class="bathing-score">--</strong>
-          </div>
-          <p id="bathing-label" class="vv-text mt-4 text-lg font-bold">Henter badevær</p>
-          <p id="bathing-description" class="vv-soft mt-2 text-sm leading-relaxed">Vi sjekker luft, vind og nedbør før vi gir badevær-vurdering.</p>
-          <div id="bathing-metrics" class="bathing-metrics mt-4"></div>
-          <p id="bathing-source" class="vv-muted mt-3 text-xs">Beregnes fra MET-varsel.</p>
-          <form id="bathing-search-form" class="bathing-search mt-4" role="search">
-            <label class="field-label" for="bathing-search-input">Søk badetemperatur</label>
-            <div class="location-search">
-              <input id="bathing-search-input" class="form-field" autocomplete="off" maxlength="80" placeholder="Søk badeplass, f.eks. Bystranda">
-              <button class="primary-button" type="submit">Søk</button>
-            </div>
-            <p id="bathing-search-status" class="vv-muted mt-2 text-xs">Finn ferske badetemperaturer fra Yr uten å endre resten av appen.</p>
-          </form>
-          <div id="bathing-search-results" class="bathing-search-results hidden-view" aria-live="polite"></div>
-          <button id="bathing-report-button" class="vv-btn-ghost mt-4 flex min-h-11 w-full items-center justify-center gap-2 text-sm font-semibold" type="button">Foreslå badeplass til Yr</button>
-          <form id="bathing-place-form" class="bathing-place-form hidden-view" autocomplete="on">
-            <div>
-              <label class="field-label" for="bathing-place-name">Navn på badeplass</label>
-              <input id="bathing-place-name" class="form-field" name="place_name" type="text" maxlength="120" placeholder="For eksempel Hamresanden" required>
-            </div>
-            <div class="bathing-place-grid">
-              <div>
-                <label class="field-label" for="bathing-place-lat">Latitude</label>
-                <input id="bathing-place-lat" class="form-field" name="latitude" type="number" inputmode="decimal" step="0.000001" min="-90" max="90" placeholder="58.1502" required>
-              </div>
-              <div>
-                <label class="field-label" for="bathing-place-lon">Longitude</label>
-                <input id="bathing-place-lon" class="form-field" name="longitude" type="number" inputmode="decimal" step="0.000001" min="-180" max="180" placeholder="7.9470" required>
-              </div>
-            </div>
-            <div>
-              <label class="field-label" for="bathing-place-reporter">Navn eller e-post</label>
-              <input id="bathing-place-reporter" class="form-field" name="reporter" type="text" maxlength="120" placeholder="Valgfritt, men nyttig">
-            </div>
-            <div>
-              <label class="field-label" for="bathing-place-note">Notat</label>
-              <textarea id="bathing-place-note" class="form-field form-textarea" name="note" maxlength="500" placeholder="Kort notat hvis koordinatene bør sjekkes"></textarea>
-            </div>
-            <p class="vv-muted text-xs leading-relaxed">Forslaget lagres til kontroll før det sendes videre til Yr.</p>
-            <button class="primary-button w-full" type="submit">Send badeplassforslag</button>
-          </form>
-        </section>
-
-        <div class="vv-divider" role="presentation"></div>
-
-        <section class="glass-card p-5" aria-labelledby="observations-title">
-          <div class="mb-5 flex items-center justify-between gap-4">
-            <h2 id="observations-title" class="section-label">Siste observasjoner</h2>
-            <span class="live-pill">
-              <span class="live-dot" aria-hidden="true"></span>
-              Live nå
-            </span>
-          </div>
-          <div id="observations-list" class="flex flex-col gap-2"></div>
-        </section>
-
-        <section id="hub-section" class="glass-card p-5" aria-labelledby="hub-title">
-          <div class="mb-5 flex items-start justify-between gap-4">
-            <div>
-              <p class="section-label">Lokal værhub</p>
-              <h2 id="hub-title" class="vv-text mt-2 text-xl font-bold">Spør, tips og lokale meldinger</h2>
-              <p id="hub-profile-status" class="vv-muted mt-2 text-xs">Logg inn med navn og PIN under Profil for å poste og stemme.</p>
-            </div>
-            <button id="hub-refresh-button" class="vv-btn-ghost px-3 py-2 text-xs font-bold" type="button">Oppdater</button>
-          </div>
-
-          <form id="hub-post-form" class="hub-post-form">
-            <div class="hub-form-grid">
-              <div>
-                <label class="field-label" for="hub-post-title">Tittel</label>
-                <input id="hub-post-title" class="form-field" name="title" maxlength="140" placeholder="Hva skjer med været hos deg?" required>
-              </div>
-              <div>
-                <label class="field-label" for="hub-post-category">Type</label>
-                <select id="hub-post-category" class="form-field" name="category">
-                  <option value="general">Innlegg</option>
-                  <option value="question">Spørsmål</option>
-                  <option value="warning">Varsel</option>
-                  <option value="tip">Tips</option>
-                  <option value="photo">Bilde/observasjon</option>
-                </select>
-              </div>
-            </div>
-            <label class="field-label" for="hub-post-body">Tekst</label>
-            <textarea id="hub-post-body" class="form-field form-textarea" name="body" maxlength="1200" placeholder="Skriv kort. F.eks. glatt vei, rare skyer, lokal byge, badetips eller spørsmål." required></textarea>
-            <p id="hub-post-location" class="vv-muted text-xs">Innlegget kobles til aktivt sted.</p>
-            <button class="primary-button w-full" type="submit">Publiser i Værhub</button>
-          </form>
-
-          <div class="hub-feed-toolbar">
-            <button class="hub-sort-button" type="button" data-hub-sort="new" data-active="true">Nyeste</button>
-            <button class="hub-sort-button" type="button" data-hub-sort="top">Topp</button>
-          </div>
-          <div id="hub-feed" class="hub-feed" aria-live="polite"></div>
-        </section>
-
-        <section class="dashboard-panel panel-meteorologists" aria-labelledby="meteorologists-title">
-          <div class="section-heading-row">
-            <div>
-              <p class="section-label">Siste fra meteorologene</p>
-              <h2 id="meteorologists-title" class="vv-text mt-2 text-xl font-bold">Offisielle kilder</h2>
-            </div>
-            <span class="section-chip">MET / Yr</span>
-          </div>
-          <div class="meteorologist-grid mt-5">
-            <a class="meteorologist-card" href="https://www.yr.no/nb/farevarsler" target="_blank" rel="noopener noreferrer">
-              <span class="meteorologist-icon" aria-hidden="true">⚠️</span>
-              <strong>Farevarsler</strong>
-              <span>Se siste varsler for vind, regn, snø og ekstremvær.</span>
-            </a>
-            <a class="meteorologist-card" href="https://www.yr.no/nb/kart/radar" target="_blank" rel="noopener noreferrer">
-              <span class="meteorologist-icon" aria-hidden="true">🌧️</span>
-              <strong>Nedbørkart</strong>
-              <span>Åpne radar og følg bygene rundt deg i sanntid.</span>
-            </a>
-            <a class="meteorologist-card" href="https://badetemperaturer.yr.no/" target="_blank" rel="noopener noreferrer">
-              <span class="meteorologist-icon" aria-hidden="true">🌊</span>
-              <strong>Badetemperaturer</strong>
-              <span>Offisielle målinger levert av Yr og lokale bidrag.</span>
-            </a>
-          </div>
-        </section>
-
-        <section class="glass-card p-5" aria-labelledby="patchnote-title">
-          <p class="section-label">Nyeste patchnote</p>
-          <article class="patch-card mt-3">
-            <div class="mb-2 flex items-center gap-2">
-              <span class="new-badge">Nytt</span>
-              <time class="vv-muted text-xs" datetime="2026-05-20">20.05.2026</time>
-            </div>
-            <h2 id="patchnote-title" class="vv-text mb-1 text-base font-bold">Stor app-oppdatering</h2>
-            <p class="vv-soft text-sm leading-relaxed">
-              Værvakt er nærmere en ekte mobilapp, med mer stabil rapportflyt og bedre handoff for videre utvikling.
-            </p>
-          </article>
-          <button id="patchnotes-button" class="vv-btn-ghost mt-3 flex min-h-11 w-full items-center justify-center gap-2 text-sm font-semibold">
-            Se alle patchnotes
-            <span aria-hidden="true">›</span>
-          </button>
-        </section>
-
-        <section id="support-section" class="glass-card p-5" aria-labelledby="support-title">
-          <div class="mb-2 flex items-center gap-2">
-            <p class="section-label">Støtt Værvakt</p>
-            <span id="support-status" class="new-badge">Vipps</span>
-          </div>
-          <h2 id="support-title" class="vv-text mt-3 text-base font-bold">Hold Værvakt i gang</h2>
-          <p id="support-copy" class="vv-soft mt-2 text-sm leading-relaxed">
-            Bidrag hjelper oss med drift, varsler og bedre lokal værdekning uten å fylle appen med reklame.
-          </p>
-          <a id="support-link" class="primary-button mt-4 flex min-h-11 w-full items-center justify-center text-sm font-semibold" href="#" target="_blank" rel="noopener noreferrer" hidden>Støtt med Vipps</a>
-        </section>
-        </div>
-
-        <section class="app-view hidden-view glass-card p-5" data-view="map" aria-labelledby="map-title">
-          <p class="section-label">Kart</p>
-          <h1 id="map-title" class="vv-text mt-3 text-xl font-bold">Lokale observasjoner</h1>
-          <div id="leaflet-map" class="vv-map mt-5"></div>
-          <p id="map-status" class="vv-muted mt-3 text-sm">Henter kartpunkter...</p>
-          <div id="map-list" class="mt-5 flex flex-col gap-3"></div>
-        </section>
-
-        <section class="app-view hidden-view glass-card p-5" data-view="report" aria-labelledby="report-title">
-          <p class="section-label">Rapporter</p>
-          <h1 id="report-title" class="vv-text mt-3 text-xl font-bold">Ny observasjon</h1>
-          <form id="report-form" class="mt-5 flex flex-col gap-3">
-            <label class="sr-only" for="report-name">Navn</label>
-            <input id="report-name" name="user" class="form-field" autocomplete="nickname" maxlength="50" required placeholder="Ditt navn">
-
-            <label class="sr-only" for="report-condition">Værtype</label>
-            <select id="report-condition" name="condition" class="form-field" required>
-              <option value="">Velg værtype</option>
-              <option value="Sol / Klart">Sol / Klart</option>
-              <option value="Overskyet">Overskyet</option>
-              <option value="Regn / Byger">Regn / Byger</option>
-              <option value="Snø / Sludd">Snø / Sludd</option>
-              <option value="Tåke">Tåke</option>
-              <option value="Kraftig vind">Kraftig vind</option>
-            </select>
-
-            <label class="sr-only" for="report-location">Sted</label>
-            <input id="report-location" name="location" class="form-field" autocomplete="address-level2" maxlength="100" required placeholder="Sted eller nabolag">
-
-            <label class="sr-only" for="report-temp">Temperatur</label>
-            <input id="report-temp" name="temp" class="form-field" inputmode="decimal" type="number" step="0.1" required placeholder="Temperatur °C">
-
-            <input id="report-lat" name="lat" type="hidden">
-            <input id="report-lon" name="lon" type="hidden">
-            <button id="use-position-button" class="vv-btn-ghost flex min-h-11 w-full items-center justify-center gap-2 text-sm font-semibold" type="button">Bruk min posisjon på kartet</button>
-
-            <button class="primary-button" type="submit">Send værrapport</button>
-          </form>
-        </section>
-
-        <section class="app-view hidden-view glass-card p-5" data-view="favorites" aria-labelledby="favorites-title">
-          <p class="section-label">Favoritter</p>
-          <h1 id="favorites-title" class="vv-text mt-3 text-xl font-bold">Lagrede steder</h1>
-          <div id="favorites-list" class="mt-5 flex flex-col gap-3"></div>
-        </section>
-
-        <section class="app-view hidden-view glass-card p-5" data-view="alerts" aria-labelledby="alerts-title">
-          <p class="section-label">Varsler</p>
-          <h1 id="alerts-title" class="vv-text mt-3 text-xl font-bold">Push-varsler</h1>
-          <p id="push-copy" class="vv-soft mt-3 text-sm leading-relaxed">Aktiver push-varsler for lokale væroppdateringer når VAPID-nøkkelen er satt.</p>
-          <button id="push-action-button" class="primary-button mt-5" type="button">Aktiver varsler</button>
-        </section>
-        <section class="app-view hidden-view glass-card p-5" data-view="settings" aria-labelledby="settings-title">
-          <p class="section-label">Innstillinger</p>
-          <h1 id="settings-title" class="vv-text mt-3 text-xl font-bold">Profil og personvern</h1>
-          <p class="vv-soft mt-3 text-sm leading-relaxed">
-            Værhub bruker bare visningsnavn og PIN. Ingen e-post, telefonnummer eller ekte brukerprofil kreves.
-          </p>
-
-          <article class="settings-card mt-5">
-            <p class="section-label">Aktiv profil</p>
-            <h2 id="hub-active-profile" class="vv-text mt-2 text-lg font-bold">Ikke logget inn</h2>
-            <p id="hub-active-profile-note" class="vv-muted mt-2 text-sm">Opprett eller logg inn for å poste og stemme i Værhub.</p>
-            <button id="hub-logout-button" class="vv-btn-ghost mt-4 hidden-view px-4 py-3 text-sm font-bold" type="button">Logg ut lokalt</button>
-          </article>
-
-          <form id="hub-auth-form" class="settings-card mt-4">
-            <div>
-              <label class="field-label" for="hub-auth-name">Navn</label>
-              <input id="hub-auth-name" class="form-field" name="displayName" autocomplete="nickname" maxlength="80" placeholder="For eksempel Patrick" required>
-            </div>
-            <div>
-              <label class="field-label" for="hub-auth-pin">PIN-kode</label>
-              <input id="hub-auth-pin" class="form-field" name="pin" type="password" inputmode="numeric" minlength="4" maxlength="32" placeholder="Minst 4 tegn" required>
-            </div>
-            <div class="hub-auth-actions">
-              <button class="primary-button" type="submit" data-hub-auth-action="login">Logg inn</button>
-              <button class="vv-btn-ghost px-4 py-3 text-sm font-bold" type="submit" data-hub-auth-action="register">Opprett profil</button>
-            </div>
-            <p class="vv-muted text-xs leading-relaxed">
-              PIN lagres kun som hash på serveren. Nettleseren lagrer en lokal token slik at du slipper å skrive PIN hver gang.
-            </p>
-          </form>
-
-          <article class="settings-card mt-4">
-            <p class="section-label">Dataflyt</p>
-            <p class="vv-soft mt-2 text-sm leading-relaxed">
-              Innlegg kobles til aktivt sted og dagens værsnapshot fra MET/Yr-visningen. Værhub henter ikke Yr-data på nytt.
-            </p>
-          </article>
-
-          <button id="settings-close-button" class="primary-button mt-5 w-full" type="button">Tilbake til appen</button>
-        </section>
-      </main>
-
-      <nav class="bottom-nav" aria-label="Hovednavigasjon">
-        <div id="bottom-nav-items" class="bottom-nav-inner mx-auto flex justify-around"></div>
-      </nav>
-
-      <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
-    </div>
-
-    <script src="vendor/leaflet/leaflet.js?v=20260612-hub1" defer></script>
-    <script src="app.js?v=20260612-hub1" defer></script>
-    <script src="script.js?v=20260612-hub1" defer></script>
+  <body>
+    <main>
+      <p class="eyebrow">Værvakt.no</p>
+      <h1>V2 bygges</h1>
+      <p>Vi starter med blanke ark og bygger en ryddigere lokal værapp fra bunnen av.</p>
+    </main>
   </body>
 </html>

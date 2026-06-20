@@ -1,9 +1,9 @@
-const CACHE_NAME = 'vaervakt-v2-20260620-a';
+const CACHE_NAME = 'vaervakt-v2-20260620-c';
 const ASSETS = [
   '/',
   '/index.html',
-  '/assets/css/app.css?v=20260620-v2a',
-  '/assets/js/app.js?v=20260620-v2a',
+  '/assets/css/app.css?v=20260620-v2c',
+  '/assets/js/app.js?v=20260620-v2c',
   '/assets/icon.svg',
   '/manifest.json'
 ];
@@ -24,6 +24,13 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(fetch(event.request));
+    return;
+  }
+
+  if (event.request.mode === 'navigate' || event.request.destination === 'document') {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match('/index.html'))
+    );
     return;
   }
 

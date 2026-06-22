@@ -15,7 +15,9 @@ Backup av gammel app:
 - `api/weather.php`: MET-varsel og valgfri Yr badetemperatur.
 - `api/reports.php`: Lokale værrapporter.
 - `api/hub.php`: Værhub med navn + PIN.
+- `api/track.php`: Anonym besøkslogging for admin-statistikk.
 - `api/geocode.php`: Stedssøk og reverse geocoding via Nominatim.
+- `admin/index.php`: Desktop-only adminpanel med rapporter, Værhub, bildeglimt og trafikk.
 - `manifest.json` og `service-worker.js`: PWA.
 
 ## Personvern
@@ -24,7 +26,7 @@ Værhub bruker bare visningsnavn og PIN. PIN lagres med `password_hash()`. Det s
 
 ## Neste naturlige steg
 
-1. Admin-dashboard for moderering av rapporter og hub-innlegg.
+1. Mer avansert moderering i admin, for eksempel brukerblokkering og massehandlinger.
 2. Kartvisning når rapporter med koordinater finnes.
 3. Bedre badetemperatur-søk og badeplassforslag.
 4. Push-varsler når VAPID og varslingsstrategi er klar.

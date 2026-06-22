@@ -17,7 +17,7 @@ Backup av gammel app:
 - `api/hub.php`: Værhub med navn + PIN.
 - `api/track.php`: Anonym besøkslogging for admin-statistikk.
 - `api/geocode.php`: Stedssøk og reverse geocoding via Nominatim.
-- `admin/index.php`: Desktop-only adminpanel med rapporter, Værhub, bildeglimt og trafikk.
+- `admin/index.php`: Desktop-only adminpanel med rapporter, bildeglimt og trafikk.
 - `manifest.json` og `service-worker.js`: PWA.
 
 ## Personvern

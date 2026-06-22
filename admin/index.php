@@ -159,18 +159,6 @@ function admin_handle_action(PDO $pdo): ?string
         return 'Rapporten ble slettet.';
     }
 
-    if ($action === 'hide_post' && $id > 0 && admin_table_exists($pdo, 'weather_hub_posts')) {
-        $stmt = $pdo->prepare("UPDATE weather_hub_posts SET status = 'hidden' WHERE id = ? LIMIT 1");
-        $stmt->execute([$id]);
-        return 'Værhub-innlegget ble skjult.';
-    }
-
-    if ($action === 'show_post' && $id > 0 && admin_table_exists($pdo, 'weather_hub_posts')) {
-        $stmt = $pdo->prepare("UPDATE weather_hub_posts SET status = 'visible' WHERE id = ? LIMIT 1");
-        $stmt->execute([$id]);
-        return 'Værhub-innlegget ble synlig igjen.';
-    }
-
     if ($action === 'delete_glimpse' && $id > 0 && admin_table_exists($pdo, 'weather_glimpse_photos')) {
         $stmt = $pdo->prepare('SELECT image_path FROM weather_glimpse_photos WHERE id = ? LIMIT 1');
         $stmt->execute([$id]);
@@ -240,8 +228,6 @@ $reports = [];
 $places = [];
 $weatherTypes = [];
 $visitsByPath = [];
-$hubPosts = [];
-$users = [];
 $glimpses = [];
 
 if ($isLoggedIn) {
@@ -262,7 +248,6 @@ if ($isLoggedIn) {
             'reportsTotal' => admin_count($pdo, 'weather_reports'),
             'reports24' => admin_count($pdo, 'weather_reports', 'created_at >= (NOW() - INTERVAL 24 HOUR)'),
             'mapPoints' => admin_count($pdo, 'weather_reports', 'latitude IS NOT NULL AND longitude IS NOT NULL'),
-            'hubPosts' => admin_count($pdo, 'weather_hub_posts', "status <> 'deleted'"),
             'activeGlimpses' => admin_count($pdo, 'weather_glimpse_photos', 'expires_at > NOW()'),
         ];
 
@@ -270,8 +255,6 @@ if ($isLoggedIn) {
         $places = admin_fetch_all($pdo, 'weather_reports', 'SELECT location, COUNT(*) AS total FROM weather_reports GROUP BY location ORDER BY total DESC, location ASC LIMIT 12');
         $weatherTypes = admin_fetch_all($pdo, 'weather_reports', 'SELECT weather_condition, COUNT(*) AS total FROM weather_reports GROUP BY weather_condition ORDER BY total DESC, weather_condition ASC LIMIT 12');
         $visitsByPath = admin_fetch_all($pdo, 'site_visits', "SELECT path, COUNT(DISTINCT visitor_hash) AS unique_visitors, COUNT(*) AS views FROM site_visits WHERE created_at >= (NOW() - INTERVAL 24 HOUR) GROUP BY path ORDER BY views DESC LIMIT 12");
-        $hubPosts = admin_fetch_all($pdo, 'weather_hub_posts', 'SELECT * FROM weather_hub_posts ORDER BY created_at DESC LIMIT 80');
-        $users = admin_fetch_all($pdo, 'weather_hub_users', 'SELECT id, display_name, created_at, last_seen_at FROM weather_hub_users ORDER BY COALESCE(last_seen_at, created_at) DESC LIMIT 80');
         $glimpses = admin_fetch_all($pdo, 'weather_glimpse_photos', 'SELECT * FROM weather_glimpse_photos ORDER BY created_at DESC LIMIT 80');
     } catch (Throwable $error) {
         $dbError = $error->getMessage();
@@ -497,7 +480,7 @@ if ($isLoggedIn) {
       <div>
         <p class="eyebrow">Værvakt Admin</p>
         <h1>Dashboard</h1>
-        <p class="muted" style="margin-top:8px">Rapporter, Værhub, bildeglimt og anonym trafikk.</p>
+        <p class="muted" style="margin-top:8px">Rapporter, bildeglimt og anonym trafikk.</p>
       </div>
       <div class="actions">
         <a class="button" href="/">Åpne app</a>
@@ -515,46 +498,20 @@ if ($isLoggedIn) {
         <div class="stat"><span class="eyebrow">Siste time</span><strong><?= h((string) $stats['lastHour']) ?></strong><p class="muted">Unike besøkende</p></div>
         <div class="stat"><span class="eyebrow">Rapporter</span><strong><?= h((string) $stats['reportsTotal']) ?></strong><p class="muted"><?= h((string) $stats['reports24']) ?> siste 24 timer</p></div>
         <div class="stat"><span class="eyebrow">Kartpunkter</span><strong><?= h((string) $stats['mapPoints']) ?></strong><p class="muted">Rapporter med koordinater</p></div>
-        <div class="stat"><span class="eyebrow">Værhub</span><strong><?= h((string) $stats['hubPosts']) ?></strong><p class="muted">Innlegg totalt</p></div>
         <div class="stat"><span class="eyebrow">Bildeglimt</span><strong><?= h((string) $stats['activeGlimpses']) ?></strong><p class="muted">Aktive nå</p></div>
       </section>
 
       <div class="tabs">
         <a class="button <?= ($_GET['view'] ?? 'reports') === 'reports' ? 'tab-active' : '' ?>" href="/admin/?view=reports">Rapporter</a>
-        <a class="button <?= ($_GET['view'] ?? '') === 'hub' ? 'tab-active' : '' ?>" href="/admin/?view=hub">Værhub</a>
         <a class="button <?= ($_GET['view'] ?? '') === 'glimpses' ? 'tab-active' : '' ?>" href="/admin/?view=glimpses">Bildeglimt</a>
         <a class="button <?= ($_GET['view'] ?? '') === 'traffic' ? 'tab-active' : '' ?>" href="/admin/?view=traffic">Trafikk</a>
       </div>
 
       <?php $view = (string) ($_GET['view'] ?? 'reports'); ?>
+      <?php if (!in_array($view, ['reports', 'glimpses', 'traffic'], true)) $view = 'reports'; ?>
       <section class="grid main">
         <div class="card">
-          <?php if ($view === 'hub'): ?>
-            <div class="card-head"><h2>Værhub innlegg</h2><span class="pill"><?= count($hubPosts) ?> vist</span></div>
-            <div class="table-wrap">
-              <table>
-                <thead><tr><th>Tid</th><th>Bruker</th><th>Innhold</th><th>Sted</th><th>Status</th><th>Handling</th></tr></thead>
-                <tbody>
-                <?php foreach ($hubPosts as $post): ?>
-                  <tr>
-                    <td><?= h((string) $post['created_at']) ?></td>
-                    <td><?= h((string) $post['display_name']) ?></td>
-                    <td><strong><?= h((string) $post['title']) ?></strong><br><span class="muted"><?= h(vv_limit((string) $post['body'], 180)) ?></span></td>
-                    <td><?= h((string) $post['location']) ?></td>
-                    <td><span class="pill"><?= h((string) $post['status']) ?></span></td>
-                    <td>
-                      <form method="post" class="inline-form">
-                        <input type="hidden" name="csrf" value="<?= h(admin_csrf()) ?>">
-                        <input type="hidden" name="id" value="<?= h((string) $post['id']) ?>">
-                        <button name="action" value="<?= $post['status'] === 'visible' ? 'hide_post' : 'show_post' ?>"><?= $post['status'] === 'visible' ? 'Skjul' : 'Vis' ?></button>
-                      </form>
-                    </td>
-                  </tr>
-                <?php endforeach; ?>
-                </tbody>
-              </table>
-            </div>
-          <?php elseif ($view === 'glimpses'): ?>
+          <?php if ($view === 'glimpses'): ?>
             <div class="card-head"><h2>Bildeglimt</h2><span class="pill"><?= count($glimpses) ?> vist</span></div>
             <div class="table-wrap">
               <table>
@@ -634,13 +591,6 @@ if ($isLoggedIn) {
             <div class="card-body list">
               <?php foreach ($weatherTypes as $type): ?><div class="list-row"><span><?= h((string) $type['weather_condition']) ?></span><strong><?= h((string) $type['total']) ?></strong></div><?php endforeach; ?>
               <?php if (!$weatherTypes): ?><p class="muted">Ingen værtyper ennå.</p><?php endif; ?>
-            </div>
-          </div>
-          <div class="card">
-            <div class="card-head"><h2>Værhub-brukere</h2><span class="pill"><?= count($users) ?></span></div>
-            <div class="card-body list">
-              <?php foreach ($users as $user): ?><div class="list-row"><span><?= h((string) $user['display_name']) ?><br><small class="muted">Sist sett: <?= h((string) ($user['last_seen_at'] ?: $user['created_at'])) ?></small></span><strong>#<?= h((string) $user['id']) ?></strong></div><?php endforeach; ?>
-              <?php if (!$users): ?><p class="muted">Ingen Værhub-brukere ennå.</p><?php endif; ?>
             </div>
           </div>
         </aside>

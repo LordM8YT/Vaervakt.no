@@ -1,0 +1,21 @@
+name: Cleanup expired weather glimpses
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: cleanup-expired-glimpses
+  cancel-in-progress: true
+
+jobs:
+  cleanup:
+    name: Delete expired glimpse photos
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call cleanup endpoint
+        run: |
+          set -eu
+          curl --fail --silent --show-error --max-time 20 \
+            "https://xn--vrvakt-pua.no/api/glimpses.php?cleanup=1"

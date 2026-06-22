@@ -8,6 +8,7 @@
 node_modules/
 repo/
 statistikk/
+uploads/
 *.log
 *.sql.bak
 *.zip

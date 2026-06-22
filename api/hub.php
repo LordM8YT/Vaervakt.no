@@ -71,6 +71,18 @@ function vv_hub_token_hash(string $token): string
     return hash('sha256', 'vv2-token|' . trim($token));
 }
 
+function vv_hub_token_column(PDO $pdo): string
+{
+    if (vv_table_has_column($pdo, 'weather_hub_users', 'token_hash')) {
+        return 'token_hash';
+    }
+    if (vv_table_has_column($pdo, 'weather_hub_users', 'auth_token_hash')) {
+        return 'auth_token_hash';
+    }
+    $pdo->exec('ALTER TABLE weather_hub_users ADD COLUMN token_hash CHAR(64) NULL AFTER pin_hash');
+    return 'token_hash';
+}
+
 function vv_hub_auth(PDO $pdo, array $input): array
 {
     $userId = (int) ($input['userId'] ?? 0);
@@ -79,7 +91,8 @@ function vv_hub_auth(PDO $pdo, array $input): array
         vv_error('Logg inn med navn og PIN først.', 401);
     }
 
-    $stmt = $pdo->prepare('SELECT id, display_name FROM weather_hub_users WHERE id = ? AND token_hash = ? LIMIT 1');
+    $tokenColumn = vv_hub_token_column($pdo);
+    $stmt = $pdo->prepare("SELECT id, display_name FROM weather_hub_users WHERE id = ? AND {$tokenColumn} = ? LIMIT 1");
     $stmt->execute([$userId, vv_hub_token_hash($token)]);
     $user = $stmt->fetch();
     if (!$user) {
@@ -92,6 +105,7 @@ function vv_hub_auth(PDO $pdo, array $input): array
 
 function vv_hub_login_or_register(PDO $pdo, array $input, bool $register): void
 {
+    $tokenColumn = vv_hub_token_column($pdo);
     $name = trim((string) ($input['displayName'] ?? ''));
     $pin = trim((string) ($input['pin'] ?? ''));
     if (vv_len($name) < 2 || vv_len($name) > 80) {
@@ -111,7 +125,7 @@ function vv_hub_login_or_register(PDO $pdo, array $input, bool $register): void
             vv_error('Navnet er allerede tatt. Logg inn eller velg et annet navn.', 409);
         }
         $token = vv_hub_token();
-        $insert = $pdo->prepare('INSERT INTO weather_hub_users (display_name, name_key, pin_hash, token_hash, last_seen_at) VALUES (?, ?, ?, ?, NOW())');
+        $insert = $pdo->prepare("INSERT INTO weather_hub_users (display_name, name_key, pin_hash, {$tokenColumn}, last_seen_at) VALUES (?, ?, ?, ?, NOW())");
         $insert->execute([vv_limit($name, 80), $key, password_hash($pin, PASSWORD_DEFAULT), vv_hub_token_hash($token)]);
         vv_json([
             'success' => true,
@@ -125,7 +139,7 @@ function vv_hub_login_or_register(PDO $pdo, array $input, bool $register): void
         vv_error('Fant ikke profilen eller PIN er feil.', 401);
     }
     $token = vv_hub_token();
-    $pdo->prepare('UPDATE weather_hub_users SET token_hash = ?, last_seen_at = NOW() WHERE id = ?')->execute([vv_hub_token_hash($token), (int) $user['id']]);
+    $pdo->prepare("UPDATE weather_hub_users SET {$tokenColumn} = ?, last_seen_at = NOW() WHERE id = ?")->execute([vv_hub_token_hash($token), (int) $user['id']]);
     vv_json([
         'success' => true,
         'user' => ['id' => (int) $user['id'], 'displayName' => (string) $user['display_name']],

@@ -51,6 +51,18 @@ function vv_glimpse_token_hash(string $token): string
     return hash('sha256', 'vv2-token|' . trim($token));
 }
 
+function vv_glimpse_token_column(PDO $pdo): string
+{
+    if (vv_table_has_column($pdo, 'weather_hub_users', 'token_hash')) {
+        return 'token_hash';
+    }
+    if (vv_table_has_column($pdo, 'weather_hub_users', 'auth_token_hash')) {
+        return 'auth_token_hash';
+    }
+    $pdo->exec('ALTER TABLE weather_hub_users ADD COLUMN token_hash CHAR(64) NULL AFTER pin_hash');
+    return 'token_hash';
+}
+
 function vv_glimpse_auth(PDO $pdo, array $input): array
 {
     $userId = (int) ($input['userId'] ?? 0);
@@ -59,7 +71,8 @@ function vv_glimpse_auth(PDO $pdo, array $input): array
         vv_error('Logg inn med navn og PIN først.', 401);
     }
 
-    $stmt = $pdo->prepare('SELECT id, display_name FROM weather_hub_users WHERE id = ? AND token_hash = ? LIMIT 1');
+    $tokenColumn = vv_glimpse_token_column($pdo);
+    $stmt = $pdo->prepare("SELECT id, display_name FROM weather_hub_users WHERE id = ? AND {$tokenColumn} = ? LIMIT 1");
     $stmt->execute([$userId, vv_glimpse_token_hash($token)]);
     $user = $stmt->fetch();
     if (!$user) {

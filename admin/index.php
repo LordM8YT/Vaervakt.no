@@ -92,6 +92,19 @@ function admin_track_table(PDO $pdo): void
             KEY idx_visits_path (path, created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
+
+    if (!vv_table_has_column($pdo, 'site_visits', 'visitor_hash')) {
+        $pdo->exec("ALTER TABLE site_visits ADD COLUMN visitor_hash CHAR(64) NOT NULL DEFAULT '' AFTER id");
+    }
+    if (!vv_table_has_column($pdo, 'site_visits', 'path')) {
+        $pdo->exec("ALTER TABLE site_visits ADD COLUMN path VARCHAR(180) NOT NULL DEFAULT '/' AFTER visitor_hash");
+    }
+    if (!vv_table_has_column($pdo, 'site_visits', 'viewport')) {
+        $pdo->exec("ALTER TABLE site_visits ADD COLUMN viewport VARCHAR(32) NULL AFTER path");
+    }
+    if (!vv_table_has_column($pdo, 'site_visits', 'created_at')) {
+        $pdo->exec('ALTER TABLE site_visits ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
+    }
 }
 
 function admin_count(PDO $pdo, string $table, string $where = '1=1'): int

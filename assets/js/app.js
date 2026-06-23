@@ -38,6 +38,57 @@ function showToast(message) {
   showToast.timer = window.setTimeout(() => toast.classList.remove('is-visible'), 3200);
 }
 
+function formatAccuracySuffix(accuracy) {
+  if (!Number.isFinite(accuracy)) return '';
+  if (accuracy < 1000) return ` (ca. ${Math.round(accuracy)} m)`;
+  return ` (ca. ${(accuracy / 1000).toFixed(1).replace('.', ',')} km)`;
+}
+
+function requestBestPosition({ targetAccuracy = 35, settleMs = 6500, timeout = 12000 } = {}) {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('unsupported'));
+      return;
+    }
+
+    let bestPosition = null;
+    let settled = false;
+    let watchId = 0;
+
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeoutId);
+      window.clearTimeout(settleId);
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+      callback(value);
+    };
+
+    const timeoutId = window.setTimeout(() => {
+      if (bestPosition) finish(resolve, bestPosition);
+      else finish(reject, new Error('timeout'));
+    }, timeout);
+
+    const settleId = window.setTimeout(() => {
+      if (bestPosition) finish(resolve, bestPosition);
+    }, settleMs);
+
+    watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        if (!bestPosition || position.coords.accuracy < bestPosition.coords.accuracy) {
+          bestPosition = position;
+        }
+        if (position.coords.accuracy <= targetAccuracy) finish(resolve, position);
+      },
+      (error) => {
+        if (bestPosition) finish(resolve, bestPosition);
+        else finish(reject, error);
+      },
+      { enableHighAccuracy: true, timeout, maximumAge: 0 },
+    );
+  });
+}
+
 function profile() {
   try {
     const stored = JSON.parse(localStorage.getItem(profileKey) || 'null');
@@ -96,6 +147,8 @@ function renderWeather() {
   $('#weather-detail').textContent = weather?.summary?.detail || 'Lokalt varsel og rapporter lastes inn.';
   $('#feels-like').textContent = weather ? `${Math.round(Number(weather.current.feelsLike))}°` : '--°';
   $('#wind').textContent = weather ? `${Number(weather.current.windSpeed).toFixed(1).replace('.', ',')} m/s` : '--';
+  const uvIndex = weather?.current?.uvIndex;
+  if ($('#uv-index')) $('#uv-index').textContent = Number.isFinite(Number(uvIndex)) ? Number(uvIndex).toFixed(1).replace('.', ',') : '--';
   const nextRain = weather?.rain?.[0]?.amount;
   $('#rain').textContent = Number.isFinite(Number(nextRain)) ? `${Number(nextRain).toFixed(1).replace('.', ',')} mm` : '--';
 
@@ -265,22 +318,29 @@ function bindLocation() {
     }
   });
 
-  $('#use-location')?.addEventListener('click', () => {
+  $('#use-location')?.addEventListener('click', async () => {
     if (!navigator.geolocation) return showToast('Nettleseren støtter ikke posisjon.');
-    navigator.geolocation.getCurrentPosition(async (position) => {
+    showToast('Finner posisjonen din mer nøyaktig...');
+    try {
+      const position = await requestBestPosition({ targetAccuracy: 25, settleMs: 7500, timeout: 14000 });
+      const lat = Number(position.coords.latitude.toFixed(7));
+      const lon = Number(position.coords.longitude.toFixed(7));
       try {
-        const payload = await getJson(`/api/geocode.php?lat=${position.coords.latitude}&lon=${position.coords.longitude}`);
-        await setLocation(payload.result);
+        const payload = await getJson(`/api/geocode.php?lat=${lat}&lon=${lon}`);
+        await setLocation({ ...payload.result, lat, lon, source: 'user' });
       } catch {
         await setLocation({
-          id: `pos-${position.coords.latitude.toFixed(4)}-${position.coords.longitude.toFixed(4)}`,
+          id: `pos-${lat.toFixed(5)}-${lon.toFixed(5)}`,
           name: 'Din posisjon',
-          lat: position.coords.latitude,
-          lon: position.coords.longitude,
+          lat,
+          lon,
           source: 'user',
         });
       }
-    }, () => showToast('Kunne ikke hente posisjon.'), { enableHighAccuracy: true, timeout: 10000 });
+      showToast(`Viser ${state.location.name}${formatAccuracySuffix(position.coords.accuracy)}.`);
+    } catch {
+      showToast('Kunne ikke hente posisjon.');
+    }
   });
 }
 

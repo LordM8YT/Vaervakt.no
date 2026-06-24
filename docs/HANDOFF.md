@@ -8,25 +8,40 @@ Backup av gammel app:
 
 ## Struktur
 
-- `index.html`: App-shell og views.
-- `assets/css/app.css`: All styling.
-- `assets/js/app.js`: Frontendlogikk.
+- `index.html`: React-buildens app-shell.
+- `static/`: Bygget React, CSS og JS fra `Vaervakt-react`.
 - `api/bootstrap.php`: Felles konfig, `.env`, PDO og helpers.
-- `api/weather.php`: MET-varsel og valgfri Yr badetemperatur.
+- `api/weather.php`: MET-varsel og valgfri Yr badetemperatur for visning.
 - `api/reports.php`: Lokale værrapporter.
-- `api/hub.php`: Værhub med navn + PIN.
+- `api/glimpses.php`: Værglimt med bilde, levetid og automatisk utløp.
+- `api/bath-reports.php`: Innsending av badetemperaturer, lokal logging og forwarding til Yr.
 - `api/track.php`: Anonym besøkslogging for admin-statistikk.
 - `api/geocode.php`: Stedssøk og reverse geocoding via Nominatim.
-- `admin/index.php`: Desktop-only adminpanel med rapporter, bildeglimt og trafikk.
+- `admin/index.php`: Desktop-only adminpanel med rapporter, badetemperaturer, bildeglimt og trafikk.
 - `manifest.json` og `service-worker.js`: PWA.
+
+## Miljøvariabler
+
+- `YR_BATH_API_KEY`: API-nøkkel fra Yr. Brukes både til å hente og sende badetemperaturer.
+- `SUPPORT_URL`: Vipps-/støttelenke.
+- `ADMIN_USERNAME`, `ADMIN_PASSWORD` eller `ADMIN_PASSWORD_HASH`: Admininnlogging.
+- `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASS`, valgfritt `DB_PORT`: MySQL.
 
 ## Personvern
 
-Værhub bruker bare visningsnavn og PIN. PIN lagres med `password_hash()`. Det samles ikke inn e-post eller telefonnummer i v2-starten.
+Værglimt bruker bare visningsnavn og PIN. PIN lagres med `password_hash()`. Det samles ikke inn e-post eller telefonnummer i v2-starten.
+
+Badetemperaturer lagrer badeplassnavn, temperatur, koordinater, valgfritt visningsnavn og status fra Yr. API-nøkkelen lagres aldri i databasen eller frontend.
+
+## Badetemperatur til Yr
+
+Brukeren sender badeplassnavn og temperatur fra appen. Backend legger til koordinater, tidspunkt og `heatedWater`, lagrer forsøket lokalt i `bath_temperature_reports`, og sender JSON videre til `https://badetemperaturer.yr.no/api/registrere`.
+
+Yr krever at badeplassnavnet kan matches mot Yr sitt søk eller nærmeste sted. Hvis Yr avviser innsendingen, blir status `failed` i adminpanelet.
 
 ## Neste naturlige steg
 
-1. Mer avansert moderering i admin, for eksempel brukerblokkering og massehandlinger.
+1. Badeplassforslag/autocomplete mot Yr, slik at brukeren oftere velger et navn Yr kan matche.
 2. Kartvisning når rapporter med koordinater finnes.
-3. Bedre badetemperatur-søk og badeplassforslag.
+3. Moderering eller rate limiting på badetemp hvis innsendingen blir populær.
 4. Push-varsler når VAPID og varslingsstrategi er klar.

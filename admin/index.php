@@ -171,6 +171,12 @@ function admin_handle_action(PDO $pdo): ?string
         return 'Bildeglimtet ble slettet.';
     }
 
+    if ($action === 'delete_bath_report' && $id > 0 && admin_table_exists($pdo, 'bath_temperature_reports')) {
+        $stmt = $pdo->prepare('DELETE FROM bath_temperature_reports WHERE id = ? LIMIT 1');
+        $stmt->execute([$id]);
+        return 'Badetemperaturen ble slettet.';
+    }
+
     return 'Ingen endring ble utført.';
 }
 
@@ -229,6 +235,7 @@ $places = [];
 $weatherTypes = [];
 $visitsByPath = [];
 $glimpses = [];
+$bathReports = [];
 
 if ($isLoggedIn) {
     try {
@@ -249,6 +256,9 @@ if ($isLoggedIn) {
             'reports24' => admin_count($pdo, 'weather_reports', 'created_at >= (NOW() - INTERVAL 24 HOUR)'),
             'mapPoints' => admin_count($pdo, 'weather_reports', 'latitude IS NOT NULL AND longitude IS NOT NULL'),
             'activeGlimpses' => admin_count($pdo, 'weather_glimpse_photos', 'expires_at > NOW()'),
+            'bathTotal' => admin_count($pdo, 'bath_temperature_reports'),
+            'bathSent' => admin_count($pdo, 'bath_temperature_reports', "yr_status = 'sent'"),
+            'bathFailed' => admin_count($pdo, 'bath_temperature_reports', "yr_status = 'failed'"),
         ];
 
         $reports = admin_fetch_all($pdo, 'weather_reports', 'SELECT * FROM weather_reports ORDER BY created_at DESC LIMIT 200');
@@ -256,6 +266,7 @@ if ($isLoggedIn) {
         $weatherTypes = admin_fetch_all($pdo, 'weather_reports', 'SELECT weather_condition, COUNT(*) AS total FROM weather_reports GROUP BY weather_condition ORDER BY total DESC, weather_condition ASC LIMIT 12');
         $visitsByPath = admin_fetch_all($pdo, 'site_visits', "SELECT path, COUNT(DISTINCT visitor_hash) AS unique_visitors, COUNT(*) AS views FROM site_visits WHERE created_at >= (NOW() - INTERVAL 24 HOUR) GROUP BY path ORDER BY views DESC LIMIT 12");
         $glimpses = admin_fetch_all($pdo, 'weather_glimpse_photos', 'SELECT * FROM weather_glimpse_photos ORDER BY created_at DESC LIMIT 80');
+        $bathReports = admin_fetch_all($pdo, 'bath_temperature_reports', 'SELECT * FROM bath_temperature_reports ORDER BY created_at DESC LIMIT 120');
     } catch (Throwable $error) {
         $dbError = $error->getMessage();
     }
@@ -338,7 +349,7 @@ if ($isLoggedIn) {
     .button.primary, button.primary { background: var(--blue); color: #04111f; border-color: rgba(125, 211, 252, .7); }
     .button.danger, button.danger { background: rgba(251, 113, 133, .14); color: #fecdd3; border-color: rgba(251, 113, 133, .35); }
     .grid { display: grid; gap: 16px; }
-    .stats { grid-template-columns: repeat(8, minmax(0, 1fr)); margin-bottom: 16px; }
+    .stats { grid-template-columns: repeat(12, minmax(0, 1fr)); margin-bottom: 16px; }
     .stat {
       grid-column: span 2;
       border: 1px solid var(--border);
@@ -480,7 +491,7 @@ if ($isLoggedIn) {
       <div>
         <p class="eyebrow">Værvakt Admin</p>
         <h1>Dashboard</h1>
-        <p class="muted" style="margin-top:8px">Rapporter, bildeglimt og anonym trafikk.</p>
+        <p class="muted" style="margin-top:8px">Rapporter, badetemperaturer, bildeglimt og anonym trafikk.</p>
       </div>
       <div class="actions">
         <a class="button" href="/">Åpne app</a>
@@ -499,16 +510,18 @@ if ($isLoggedIn) {
         <div class="stat"><span class="eyebrow">Rapporter</span><strong><?= h((string) $stats['reportsTotal']) ?></strong><p class="muted"><?= h((string) $stats['reports24']) ?> siste 24 timer</p></div>
         <div class="stat"><span class="eyebrow">Kartpunkter</span><strong><?= h((string) $stats['mapPoints']) ?></strong><p class="muted">Rapporter med koordinater</p></div>
         <div class="stat"><span class="eyebrow">Bildeglimt</span><strong><?= h((string) $stats['activeGlimpses']) ?></strong><p class="muted">Aktive nå</p></div>
+        <div class="stat"><span class="eyebrow">Badetemp</span><strong><?= h((string) $stats['bathTotal']) ?></strong><p class="muted"><?= h((string) $stats['bathSent']) ?> sendt, <?= h((string) $stats['bathFailed']) ?> feilet</p></div>
       </section>
 
       <div class="tabs">
         <a class="button <?= ($_GET['view'] ?? 'reports') === 'reports' ? 'tab-active' : '' ?>" href="/admin/?view=reports">Rapporter</a>
+        <a class="button <?= ($_GET['view'] ?? '') === 'bath' ? 'tab-active' : '' ?>" href="/admin/?view=bath">Badetemp</a>
         <a class="button <?= ($_GET['view'] ?? '') === 'glimpses' ? 'tab-active' : '' ?>" href="/admin/?view=glimpses">Bildeglimt</a>
         <a class="button <?= ($_GET['view'] ?? '') === 'traffic' ? 'tab-active' : '' ?>" href="/admin/?view=traffic">Trafikk</a>
       </div>
 
       <?php $view = (string) ($_GET['view'] ?? 'reports'); ?>
-      <?php if (!in_array($view, ['reports', 'glimpses', 'traffic'], true)) $view = 'reports'; ?>
+      <?php if (!in_array($view, ['reports', 'bath', 'glimpses', 'traffic'], true)) $view = 'reports'; ?>
       <section class="grid main">
         <div class="card">
           <?php if ($view === 'glimpses'): ?>
@@ -534,6 +547,36 @@ if ($isLoggedIn) {
                     </td>
                   </tr>
                 <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          <?php elseif ($view === 'bath'): ?>
+            <div class="card-head"><h2>Badetemperaturer</h2><span class="pill">Viser <?= count($bathReports) ?> av <?= h((string) $stats['bathTotal']) ?></span></div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Tid</th><th>Badeplass</th><th>Bruker</th><th>Temp</th><th>Koordinater</th><th>Status</th><th>Yr-svar</th><th>Handling</th></tr></thead>
+                <tbody>
+                <?php foreach ($bathReports as $bath): ?>
+                  <tr>
+                    <td><?= h((string) $bath['created_at']) ?></td>
+                    <td><strong><?= h((string) $bath['name']) ?></strong><br><span class="muted"><?= ((int) $bath['heated_water'] === 1) ? 'Oppvarmet vann' : 'Naturlig vann' ?></span></td>
+                    <td><?= h((string) ($bath['reporter'] ?? '')) ?></td>
+                    <td><strong><?= h((string) number_format((float) $bath['temperature'], 1, ',', '')) ?>°</strong></td>
+                    <td class="muted"><?= h((string) $bath['latitude'] . ', ' . (string) $bath['longitude']) ?></td>
+                    <td><span class="pill"><?= h((string) $bath['yr_status']) ?><?= $bath['yr_http_status'] ? ' · ' . h((string) $bath['yr_http_status']) : '' ?></span></td>
+                    <td class="muted"><?= h((string) ($bath['yr_message'] ?? '')) ?></td>
+                    <td>
+                      <form method="post" class="inline-form">
+                        <input type="hidden" name="csrf" value="<?= h(admin_csrf()) ?>">
+                        <input type="hidden" name="id" value="<?= h((string) $bath['id']) ?>">
+                        <button class="danger" name="action" value="delete_bath_report">Slett</button>
+                      </form>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+                <?php if (!$bathReports): ?>
+                  <tr><td colspan="8" class="muted">Ingen badetemperaturer sendt inn ennå.</td></tr>
+                <?php endif; ?>
                 </tbody>
               </table>
             </div>

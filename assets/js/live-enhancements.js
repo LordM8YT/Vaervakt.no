@@ -10,6 +10,7 @@
     weather: null,
     weatherLocationId: "",
     isWeatherLoading: false,
+    autoLocateAttempted: false,
     pushStatus: "idle",
   };
 
@@ -119,6 +120,34 @@
     if (uv >= 6) return { label: "Høy", className: "vv-uv-high" };
     if (uv >= 3) return { label: "Moderat", className: "vv-uv-mid" };
     return { label: "Lav", className: "vv-uv-low" };
+  }
+
+  function visibleText(element) {
+    return String(element && element.textContent || "").trim().replace(/\s+/g, " ");
+  }
+
+  function isDefaultLocationVisible() {
+    return Array.from(document.querySelectorAll("h2,h3,p,span"))
+      .some((element) => visibleText(element).includes("Kristiansand"));
+  }
+
+  async function autoLocate() {
+    if (state.autoLocateAttempted || !("geolocation" in navigator)) return;
+    state.autoLocateAttempted = true;
+
+    try {
+      if (navigator.permissions && navigator.permissions.query) {
+        const permission = await navigator.permissions.query({ name: "geolocation" });
+        if (permission.state === "denied") return;
+      }
+    } catch {
+      // Some browsers do not support querying geolocation permission. The app button handles that path.
+    }
+
+    const button = Array.from(document.querySelectorAll("button"))
+      .find((item) => visibleText(item) === "Bruk posisjon");
+    if (!button || !isDefaultLocationVisible()) return;
+    button.click();
   }
 
   function renderUtilityPanel() {
@@ -340,6 +369,7 @@
     window.clearTimeout(scheduleRender.timer);
     scheduleRender.timer = window.setTimeout(() => {
       improveEmptyReportCopy();
+      autoLocate();
       renderUtilityPanel();
       loadWeatherForTools();
       registerPush();

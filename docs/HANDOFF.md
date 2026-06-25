@@ -10,6 +10,7 @@ Backup av gammel app:
 
 - `index.html`: React-buildens app-shell.
 - `static/`: Bygget React, CSS og JS fra `Vaervakt-react`.
+- `assets/js/live-enhancements.js`: Lite klientlag lastet før React-bundlen. Legger kart og rapporthistorikk bak egne knapper uten å endre minifisert build.
 - `api/bootstrap.php`: Felles konfig, `.env`, PDO og helpers.
 - `api/weather.php`: MET-varsel og valgfri Yr badetemperatur for visning.
 - `api/reports.php`: Lokale værrapporter. Public GET viser som standard bare rapporter fra siste 7 dager; bruk `freshness=all` eller `maxAgeDays=0` for historikk.
@@ -42,6 +43,6 @@ Yr krever at badeplassnavnet kan matches mot Yr sitt søk eller nærmeste sted. 
 ## Neste naturlige steg
 
 1. Badeplassforslag/autocomplete mot Yr, slik at brukeren oftere velger et navn Yr kan matche.
-2. Kartvisning når rapporter med koordinater finnes.
+2. Flytte kart og rapporthistorikk inn i kildeappen når React-kilden oppdateres, slik at enhancement-laget kan fjernes.
 3. Moderering eller rate limiting på badetemp hvis innsendingen blir populær.
 4. Push-varsler når VAPID og varslingsstrategi er klar.

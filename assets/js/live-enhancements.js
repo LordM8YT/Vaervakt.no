@@ -1,12 +1,16 @@
 (function () {
+  const favoriteKey = "vaervakt_favorite_locations";
   const state = {
     location: null,
     reports: [],
     freshness: null,
-    mapOpen: false,
     historyOpen: false,
     historyReports: [],
     isHistoryLoading: false,
+    weather: null,
+    weatherLocationId: "",
+    isWeatherLoading: false,
+    pushStatus: "idle",
   };
 
   const originalFetch = window.fetch ? window.fetch.bind(window) : null;
@@ -25,6 +29,10 @@
     return url && url.pathname.endsWith("/api/reports.php");
   }
 
+  function isWeatherUrl(url) {
+    return url && url.pathname.endsWith("/api/weather.php");
+  }
+
   function rememberLocation(url) {
     const lat = Number(url.searchParams.get("lat"));
     const lon = Number(url.searchParams.get("lon"));
@@ -32,9 +40,15 @@
     state.location = {
       lat,
       lon,
-      name: url.searchParams.get("location") || "Valgt sted",
+      name: url.searchParams.get("location") || readPlaceName() || "Valgt sted",
       radiusKm: Number(url.searchParams.get("radiusKm")) || 35,
     };
+  }
+
+  function readPlaceName() {
+    const headings = Array.from(document.querySelectorAll("h2,h3"));
+    const weatherHeading = headings.find((item) => /,\s*(NO|Norge)$/i.test(item.textContent.trim()));
+    return weatherHeading ? weatherHeading.textContent.trim() : "";
   }
 
   function escapeHtml(value) {
@@ -59,199 +73,92 @@
     return heading.parentElement;
   }
 
-  function reportHasCoords(report) {
-    return Number.isFinite(Number(report.lat)) && Number.isFinite(Number(report.lon));
+  function favorites() {
+    try {
+      const items = JSON.parse(localStorage.getItem(favoriteKey) || "[]");
+      return Array.isArray(items)
+        ? items.filter((item) => item && item.name && Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lon))).slice(0, 6)
+        : [];
+    } catch {
+      return [];
+    }
   }
 
-  function mapBounds(center, reports) {
-    const coords = [
-      [center.lat, center.lon],
-      ...reports.filter(reportHasCoords).map((report) => [Number(report.lat), Number(report.lon)]),
-    ];
-    const lats = coords.map((coord) => coord[0]);
-    const lons = coords.map((coord) => coord[1]);
-    const minLat = Math.min(...lats);
-    const maxLat = Math.max(...lats);
-    const minLon = Math.min(...lons);
-    const maxLon = Math.max(...lons);
-    const latPad = Math.max(0.012, (maxLat - minLat) * 0.45);
-    const lonPad = Math.max(0.018, (maxLon - minLon) * 0.45);
-    return {
-      south: minLat - latPad,
-      north: maxLat + latPad,
-      west: minLon - lonPad,
-      east: maxLon + lonPad,
-    };
+  function setFavorites(items) {
+    localStorage.setItem(favoriteKey, JSON.stringify(items.slice(0, 6)));
   }
 
-  function mapUrl(bounds, center) {
-    const bbox = [bounds.west, bounds.south, bounds.east, bounds.north]
-      .map((value) => value.toFixed(6))
-      .join(",");
-    return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${center.lat.toFixed(6)},${center.lon.toFixed(6)}`;
+  function currentFavoriteId() {
+    if (!state.location) return "";
+    return `${Number(state.location.lat).toFixed(5)},${Number(state.location.lon).toFixed(5)}`;
   }
 
-  function osmPointUrl(lat, lon) {
-    return `https://www.openstreetmap.org/?mlat=${Number(lat).toFixed(6)}&mlon=${Number(lon).toFixed(6)}#map=15/${Number(lat).toFixed(6)}/${Number(lon).toFixed(6)}`;
+  function saveFavorite() {
+    if (!state.location) return;
+    const id = currentFavoriteId();
+    const items = favorites().filter((item) => item.id !== id);
+    items.unshift({ id, name: state.location.name || readPlaceName() || "Valgt sted", lat: state.location.lat, lon: state.location.lon });
+    setFavorites(items);
+    renderUtilityPanel();
   }
 
-  function renderMapPanel() {
+  function useFavorite(item) {
+    const input = document.querySelector("input[id$='-input'], input[type='text']");
+    if (input) {
+      input.focus();
+      input.value = item.name;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function uvLevel(value) {
+    const uv = Number(value);
+    if (!Number.isFinite(uv)) return { label: "Ukjent", className: "vv-uv-low" };
+    if (uv >= 8) return { label: "Svært høy", className: "vv-uv-high" };
+    if (uv >= 6) return { label: "Høy", className: "vv-uv-high" };
+    if (uv >= 3) return { label: "Moderat", className: "vv-uv-mid" };
+    return { label: "Lav", className: "vv-uv-low" };
+  }
+
+  function renderUtilityPanel() {
     const section = findLocalSection();
     if (!section || !state.location) return;
 
-    let panel = document.getElementById("vv-live-map-panel");
+    let panel = document.getElementById("vv-live-tools-panel");
     if (!panel) {
       panel = document.createElement("div");
-      panel.id = "vv-live-map-panel";
+      panel.id = "vv-live-tools-panel";
       section.appendChild(panel);
     }
+    ensureStyles();
 
-    const reports = state.historyOpen && state.historyReports.length ? state.historyReports : state.reports;
-    const reportsWithCoords = reports.filter(reportHasCoords);
-    const bounds = mapBounds(state.location, reportsWithCoords);
     const hiddenOld = Number(state.freshness && state.freshness.hiddenOldReports) || 0;
-    const subtitle = reportsWithCoords.length
-      ? `${reportsWithCoords.length} rapportpunkt med koordinater`
-      : `Viser valgt posisjon for ${state.location.name}`;
+    const favs = favorites();
+    const isSaved = favs.some((item) => item.id === currentFavoriteId());
+    const uvValue = state.weather && state.weather.current ? Number(state.weather.current.uvIndex) : NaN;
+    const uv = uvLevel(uvValue);
+    const uvText = Number.isFinite(uvValue) ? uvValue.toFixed(1).replace(".", ",") : "--";
 
     const panelHtml = `
-      <style>
-        #vv-live-map-panel {
-          margin-top: 14px;
-          border: 1px solid rgba(255,255,255,.08);
-          border-radius: 18px;
-          overflow: hidden;
-          background: linear-gradient(180deg, rgba(9,16,36,.72), rgba(7,12,27,.88));
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
-        }
-        .vv-map-head {
-          display: flex;
-          justify-content: space-between;
-          gap: 12px;
-          align-items: center;
-          padding: 13px 14px 11px;
-        }
-        .vv-map-title {
-          color: white;
-          font: 800 .92rem Poppins, system-ui, sans-serif;
-          margin: 0;
-        }
-        .vv-map-subtitle {
-          color: rgba(255,255,255,.48);
-          font: 500 .74rem Poppins, system-ui, sans-serif;
-          margin: 4px 0 0;
-        }
-        .vv-map-actions {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-          justify-content: flex-end;
-        }
-        .vv-map-button {
-          appearance: none;
-          border: 1px solid rgba(255,255,255,.12);
-          border-radius: 999px;
-          background: rgba(255,255,255,.06);
-          color: rgba(255,255,255,.84);
-          cursor: pointer;
-          font: 800 .72rem Poppins, system-ui, sans-serif;
-          padding: 7px 10px;
-        }
-        .vv-map-button:hover { background: rgba(255,255,255,.1); }
-        .vv-map-button[data-active="true"] {
-          background: #38bdf8;
-          border-color: rgba(186,230,253,.62);
-          color: #06111f;
-        }
-        .vv-map-wrap {
-          height: clamp(220px, 42vw, 330px);
-          background: #0b1224;
-          border-top: 1px solid rgba(255,255,255,.07);
-        }
-        .vv-map-wrap iframe {
-          width: 100%;
-          height: 100%;
-          border: 0;
-          display: block;
-          filter: saturate(.78) contrast(.92) brightness(.82);
-        }
-        .vv-map-empty {
-          padding: 0 14px 14px;
-          color: rgba(255,255,255,.62);
-          font: 500 .78rem Poppins, system-ui, sans-serif;
-        }
-        .vv-map-report-list {
-          border-top: 1px solid rgba(255,255,255,.07);
-          display: grid;
-          gap: 8px;
-          padding: 10px 14px 14px;
-        }
-        .vv-map-report {
-          align-items: center;
-          display: flex;
-          gap: 10px;
-          justify-content: space-between;
-        }
-        .vv-map-report span {
-          color: rgba(255,255,255,.78);
-          font: 700 .76rem Poppins, system-ui, sans-serif;
-          min-width: 0;
-        }
-        .vv-map-report small {
-          color: rgba(255,255,255,.46);
-          display: block;
-          font-weight: 500;
-          margin-top: 2px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        .vv-map-report a {
-          border: 1px solid rgba(255,255,255,.12);
-          border-radius: 999px;
-          color: rgba(255,255,255,.82);
-          flex: 0 0 auto;
-          font: 800 .68rem Poppins, system-ui, sans-serif;
-          padding: 6px 9px;
-          text-decoration: none;
-        }
-        .vv-map-report a:hover { background: rgba(255,255,255,.08); }
-        .vv-history-list {
-          border-top: 1px solid rgba(255,255,255,.07);
-          padding: 10px 14px 14px;
-          display: grid;
-          gap: 8px;
-        }
-        .vv-history-item {
-          display: flex;
-          justify-content: space-between;
-          gap: 10px;
-          color: rgba(255,255,255,.78);
-          font: 600 .76rem Poppins, system-ui, sans-serif;
-        }
-        .vv-history-item small {
-          color: rgba(255,255,255,.46);
-          display: block;
-          font-weight: 500;
-          margin-top: 2px;
-        }
-      </style>
-      <div class="vv-map-head">
+      <div class="vv-tools-head">
         <div>
-          <p class="vv-map-title">Kart og rapporthistorikk</p>
-          <p class="vv-map-subtitle">${escapeHtml(subtitle)}${hiddenOld ? ` · ${hiddenOld} eldre skjult` : ""}</p>
+          <p class="vv-tools-title">Rapportliste</p>
+          <p class="vv-tools-subtitle">${hiddenOld ? `${hiddenOld} eldre rapporter ligger i historikken` : `Ferske rapporter for ${escapeHtml(state.location.name)}`}</p>
         </div>
-        <div class="vv-map-actions">
-          <button class="vv-map-button" type="button" data-vv-map data-active="${state.mapOpen ? "true" : "false"}">${state.mapOpen ? "Skjul kart" : "Vis kart"}</button>
-          ${hiddenOld ? `<button class="vv-map-button" type="button" data-vv-history data-active="${state.historyOpen ? "true" : "false"}">${state.historyOpen ? "Skjul historikk" : "Vis historikk"}</button>` : ""}
+        <div class="vv-tools-actions">
+          <button class="vv-tools-button" type="button" data-vv-favorite data-active="${isSaved ? "true" : "false"}">${isSaved ? "Lagret" : "Lagre sted"}</button>
+          ${hiddenOld ? `<button class="vv-tools-button" type="button" data-vv-history data-active="${state.historyOpen ? "true" : "false"}">${state.historyOpen ? "Skjul historikk" : "Vis historikk"}</button>` : ""}
         </div>
       </div>
-      ${state.mapOpen ? `
-        <div class="vv-map-wrap">
-          <iframe title="Kart over lokale værrapporter" loading="lazy" src="${mapUrl(bounds, state.location)}"></iframe>
+      <div class="vv-tools-row">
+        <div>
+          <p class="vv-tools-title">UV nå</p>
+          <p class="vv-tools-subtitle">Fra MET for valgt sted</p>
         </div>
-        ${reportsWithCoords.length ? renderMapReportList(reportsWithCoords) : `<div class="vv-map-empty">Ingen ferske rapporter med koordinater her akkurat nå. Kartet viser valgt sted, og nye rapporter dukker opp her.</div>`}
-      ` : ""}
+        <div class="vv-uv-pill ${uv.className}"><strong>${escapeHtml(uvText)}</strong><span>${escapeHtml(uv.label)}</span></div>
+      </div>
+      ${favs.length ? `<div class="vv-fav-list">${favs.map((item) => `<button class="vv-fav-chip" type="button" data-vv-use-favorite="${escapeHtml(item.id)}">${escapeHtml(item.name)}</button>`).join("")}</div>` : ""}
       ${state.historyOpen ? renderHistoryList() : ""}
     `;
 
@@ -259,15 +166,90 @@
       panel.innerHTML = panelHtml;
       panel.__vvLastHtml = panelHtml;
     }
-    const mapButton = panel.querySelector("[data-vv-map]");
-    if (mapButton) mapButton.onclick = toggleMap;
-    const button = panel.querySelector("[data-vv-history]");
-    if (button) button.onclick = toggleHistory;
+    const favoriteButton = panel.querySelector("[data-vv-favorite]");
+    if (favoriteButton) favoriteButton.onclick = saveFavorite;
+    const historyButton = panel.querySelector("[data-vv-history]");
+    if (historyButton) historyButton.onclick = toggleHistory;
+    panel.querySelectorAll("[data-vv-use-favorite]").forEach((button) => {
+      button.onclick = () => {
+        const item = favorites().find((fav) => fav.id === button.getAttribute("data-vv-use-favorite"));
+        if (item) useFavorite(item);
+      };
+    });
   }
 
-  function toggleMap() {
-    state.mapOpen = !state.mapOpen;
-    renderMapPanel();
+  function ensureStyles() {
+    if (document.getElementById("vv-live-tools-style")) return;
+    const style = document.createElement("style");
+    style.id = "vv-live-tools-style";
+    style.textContent = `
+      #vv-live-tools-panel {
+        margin-top: 14px;
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 18px;
+        overflow: hidden;
+        background: linear-gradient(180deg, rgba(9,16,36,.72), rgba(7,12,27,.88));
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+      }
+      .vv-tools-head, .vv-tools-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        padding: 13px 14px 11px;
+      }
+      .vv-tools-head + .vv-tools-row { border-top: 1px solid rgba(255,255,255,.07); }
+      .vv-tools-title { color: white; font: 800 .92rem Poppins, system-ui, sans-serif; margin: 0; }
+      .vv-tools-subtitle { color: rgba(255,255,255,.48); font: 500 .74rem Poppins, system-ui, sans-serif; margin: 4px 0 0; }
+      .vv-tools-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+      .vv-tools-button, .vv-fav-chip {
+        appearance: none;
+        border: 1px solid rgba(255,255,255,.12);
+        border-radius: 999px;
+        background: rgba(255,255,255,.06);
+        color: rgba(255,255,255,.84);
+        cursor: pointer;
+        font: 800 .72rem Poppins, system-ui, sans-serif;
+        padding: 7px 10px;
+      }
+      .vv-tools-button:hover, .vv-fav-chip:hover { background: rgba(255,255,255,.1); }
+      .vv-tools-button[data-active="true"] { background: #38bdf8; border-color: rgba(186,230,253,.62); color: #06111f; }
+      .vv-uv-pill {
+        border-radius: 16px;
+        min-width: 74px;
+        padding: 9px 10px;
+        text-align: center;
+        border: 1px solid rgba(255,255,255,.12);
+        background: rgba(255,255,255,.06);
+      }
+      .vv-uv-pill strong { display: block; color: white; font: 900 1.15rem Poppins, system-ui, sans-serif; line-height: 1; }
+      .vv-uv-pill span { display: block; margin-top: 4px; color: rgba(255,255,255,.62); font: 700 .65rem Poppins, system-ui, sans-serif; }
+      .vv-uv-mid { background: rgba(251,191,36,.15); border-color: rgba(251,191,36,.28); }
+      .vv-uv-high { background: rgba(251,113,133,.16); border-color: rgba(251,113,133,.34); }
+      .vv-fav-list, .vv-history-list { border-top: 1px solid rgba(255,255,255,.07); padding: 10px 14px 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+      .vv-history-list { display: grid; }
+      .vv-history-item { display: flex; justify-content: space-between; gap: 10px; color: rgba(255,255,255,.78); font: 600 .76rem Poppins, system-ui, sans-serif; }
+      .vv-history-item small { color: rgba(255,255,255,.46); display: block; font-weight: 500; margin-top: 2px; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  async function loadWeatherForTools() {
+    if (!state.location || state.isWeatherLoading) return;
+    const id = currentFavoriteId();
+    if (state.weather && state.weatherLocationId === id) return;
+    state.isWeatherLoading = true;
+    try {
+      const params = new URLSearchParams({ lat: String(state.location.lat), lon: String(state.location.lon) });
+      state.weather = await originalFetch(`/api/weather.php?${params.toString()}`).then((response) => response.json());
+      state.weatherLocationId = id;
+    } catch {
+      state.weather = null;
+      state.weatherLocationId = "";
+    } finally {
+      state.isWeatherLoading = false;
+      renderUtilityPanel();
+    }
   }
 
   function renderHistoryList() {
@@ -289,24 +271,11 @@
     `;
   }
 
-  function renderMapReportList(reports) {
-    return `
-      <div class="vv-map-report-list">
-        ${reports.slice(0, 6).map((report) => `
-          <div class="vv-map-report">
-            <span>${escapeHtml(report.icon || "")} ${escapeHtml(report.condition)}<small>${escapeHtml(report.location)} · ${escapeHtml(report.time)}</small></span>
-            <a href="${osmPointUrl(report.lat, report.lon)}" target="_blank" rel="noreferrer">Åpne</a>
-          </div>
-        `).join("")}
-      </div>
-    `;
-  }
-
   async function toggleHistory() {
     state.historyOpen = !state.historyOpen;
     if (state.historyOpen && !state.historyReports.length && state.location) {
       state.isHistoryLoading = true;
-      renderMapPanel();
+      renderUtilityPanel();
       const params = new URLSearchParams({
         limit: "20",
         lat: String(state.location.lat),
@@ -324,7 +293,7 @@
         state.isHistoryLoading = false;
       }
     }
-    renderMapPanel();
+    renderUtilityPanel();
     improveEmptyReportCopy();
   }
 
@@ -339,17 +308,53 @@
     }
   }
 
+  function urlBase64ToUint8Array(base64String) {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = window.atob(base64);
+    return Uint8Array.from(Array.from(rawData).map((char) => char.charCodeAt(0)));
+  }
+
+  async function registerPush() {
+    if (state.pushStatus !== "idle" || !("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return;
+    state.pushStatus = "checking";
+    try {
+      const config = await originalFetch("/api/config.php").then((response) => response.json());
+      const vapidPublicKey = config && config.pwa && config.pwa.vapidPublicKey;
+      if (!vapidPublicKey) return;
+      const registration = await navigator.serviceWorker.register("/service-worker.js");
+      const existing = await registration.pushManager.getSubscription();
+      if (existing || Notification.permission === "denied") return;
+      if (Notification.permission !== "granted") {
+        state.pushStatus = "ready";
+        return;
+      }
+      await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) });
+      state.pushStatus = "subscribed";
+    } catch {
+      state.pushStatus = "failed";
+    }
+  }
+
   function scheduleRender() {
     window.clearTimeout(scheduleRender.timer);
     scheduleRender.timer = window.setTimeout(() => {
       improveEmptyReportCopy();
-      renderMapPanel();
+      renderUtilityPanel();
+      loadWeatherForTools();
+      registerPush();
     }, 80);
   }
 
   window.fetch = async function vvEnhancedFetch(input, init) {
     const url = parseUrl(input);
     const response = await originalFetch(input, init);
+    if (isWeatherUrl(url)) {
+      response.clone().json().then((payload) => {
+        state.weather = payload || null;
+        scheduleRender();
+      }).catch(() => {});
+    }
     if (isReportsUrl(url) && (!init || !init.method || String(init.method).toUpperCase() === "GET")) {
       rememberLocation(url);
       response.clone().json().then((payload) => {

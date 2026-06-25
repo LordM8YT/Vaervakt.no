@@ -133,6 +133,35 @@ function admin_fetch_all(PDO $pdo, string $table, string $sql): array
     return $pdo->query($sql)->fetchAll() ?: [];
 }
 
+function admin_report_scope(): string
+{
+    $scope = (string) ($_GET['reports'] ?? 'fresh');
+    return in_array($scope, ['fresh', 'old', 'all'], true) ? $scope : 'fresh';
+}
+
+function admin_report_scope_where(string $scope): string
+{
+    return match ($scope) {
+        'old' => 'created_at < (NOW() - INTERVAL 7 DAY)',
+        'all' => '1=1',
+        default => 'created_at >= (NOW() - INTERVAL 7 DAY)',
+    };
+}
+
+function admin_report_age_label(string $createdAt): string
+{
+    try {
+        $created = new DateTime($createdAt);
+        $seconds = max(0, time() - $created->getTimestamp());
+    } catch (Throwable) {
+        return 'Ukjent';
+    }
+
+    if ($seconds < 3600) return max(1, (int) floor($seconds / 60)) . ' min';
+    if ($seconds < 86400) return (int) floor($seconds / 3600) . ' t';
+    return (int) floor($seconds / 86400) . ' d';
+}
+
 function admin_delete_glimpse_file(string $relativePath): void
 {
     $root = realpath(APP_ROOT . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'glimpses');
@@ -236,6 +265,9 @@ $weatherTypes = [];
 $visitsByPath = [];
 $glimpses = [];
 $bathReports = [];
+$reportScope = admin_report_scope();
+$reportWhere = admin_report_scope_where($reportScope);
+$reportCount = 0;
 
 if ($isLoggedIn) {
     try {
@@ -254,6 +286,8 @@ if ($isLoggedIn) {
             'lastHour' => (int) admin_scalar($pdo, "SELECT COUNT(DISTINCT visitor_hash) FROM site_visits WHERE created_at >= (NOW() - INTERVAL 1 HOUR)"),
             'reportsTotal' => admin_count($pdo, 'weather_reports'),
             'reports24' => admin_count($pdo, 'weather_reports', 'created_at >= (NOW() - INTERVAL 24 HOUR)'),
+            'reportsFresh' => admin_count($pdo, 'weather_reports', 'created_at >= (NOW() - INTERVAL 7 DAY)'),
+            'reportsOld' => admin_count($pdo, 'weather_reports', 'created_at < (NOW() - INTERVAL 7 DAY)'),
             'mapPoints' => admin_count($pdo, 'weather_reports', 'latitude IS NOT NULL AND longitude IS NOT NULL'),
             'activeGlimpses' => admin_count($pdo, 'weather_glimpse_photos', 'expires_at > NOW()'),
             'bathTotal' => admin_count($pdo, 'bath_temperature_reports'),
@@ -261,7 +295,8 @@ if ($isLoggedIn) {
             'bathFailed' => admin_count($pdo, 'bath_temperature_reports', "yr_status = 'failed'"),
         ];
 
-        $reports = admin_fetch_all($pdo, 'weather_reports', 'SELECT * FROM weather_reports ORDER BY created_at DESC LIMIT 200');
+        $reportCount = admin_count($pdo, 'weather_reports', $reportWhere);
+        $reports = admin_fetch_all($pdo, 'weather_reports', "SELECT *, created_at >= (NOW() - INTERVAL 7 DAY) AS is_fresh FROM weather_reports WHERE {$reportWhere} ORDER BY created_at DESC LIMIT 200");
         $places = admin_fetch_all($pdo, 'weather_reports', 'SELECT location, COUNT(*) AS total FROM weather_reports GROUP BY location ORDER BY total DESC, location ASC LIMIT 12');
         $weatherTypes = admin_fetch_all($pdo, 'weather_reports', 'SELECT weather_condition, COUNT(*) AS total FROM weather_reports GROUP BY weather_condition ORDER BY total DESC, weather_condition ASC LIMIT 12');
         $visitsByPath = admin_fetch_all($pdo, 'site_visits', "SELECT path, COUNT(DISTINCT visitor_hash) AS unique_visitors, COUNT(*) AS views FROM site_visits WHERE created_at >= (NOW() - INTERVAL 24 HOUR) GROUP BY path ORDER BY views DESC LIMIT 12");
@@ -442,6 +477,9 @@ if ($isLoggedIn) {
     .tabs { display: flex; gap: 8px; margin: 10px 0 16px; flex-wrap: wrap; }
     .tabs a { text-decoration: none; }
     .tab-active { background: var(--blue); color: #04111f; }
+    .subtabs { display: flex; gap: 8px; flex-wrap: wrap; }
+    .status-fresh { border-color: rgba(52, 211, 153, .34); color: #bbf7d0; background: rgba(52, 211, 153, .12); }
+    .status-old { border-color: rgba(251, 191, 36, .34); color: #fde68a; background: rgba(251, 191, 36, .12); }
     .thumb {
       width: 56px;
       height: 56px;
@@ -507,7 +545,7 @@ if ($isLoggedIn) {
       <section class="grid stats">
         <div class="stat"><span class="eyebrow">Unike 24t</span><strong><?= h((string) $stats['unique24']) ?></strong><p class="muted"><?= h((string) $stats['views24']) ?> sidevisninger</p></div>
         <div class="stat"><span class="eyebrow">Siste time</span><strong><?= h((string) $stats['lastHour']) ?></strong><p class="muted">Unike besøkende</p></div>
-        <div class="stat"><span class="eyebrow">Rapporter</span><strong><?= h((string) $stats['reportsTotal']) ?></strong><p class="muted"><?= h((string) $stats['reports24']) ?> siste 24 timer</p></div>
+        <div class="stat"><span class="eyebrow">Rapporter</span><strong><?= h((string) $stats['reportsTotal']) ?></strong><p class="muted"><?= h((string) $stats['reports24']) ?> siste 24t · <?= h((string) $stats['reportsFresh']) ?> ferske</p></div>
         <div class="stat"><span class="eyebrow">Kartpunkter</span><strong><?= h((string) $stats['mapPoints']) ?></strong><p class="muted">Rapporter med koordinater</p></div>
         <div class="stat"><span class="eyebrow">Bildeglimt</span><strong><?= h((string) $stats['activeGlimpses']) ?></strong><p class="muted">Aktive nå</p></div>
         <div class="stat"><span class="eyebrow">Badetemp</span><strong><?= h((string) $stats['bathTotal']) ?></strong><p class="muted"><?= h((string) $stats['bathSent']) ?> sendt, <?= h((string) $stats['bathFailed']) ?> feilet</p></div>
@@ -593,13 +631,28 @@ if ($isLoggedIn) {
               </table>
             </div>
           <?php else: ?>
-            <div class="card-head"><h2>Alle rapporter</h2><span class="pill">Viser <?= count($reports) ?> av <?= h((string) $stats['reportsTotal']) ?></span></div>
+            <div class="card-head">
+              <div>
+                <h2>Rapporter</h2>
+                <p class="muted" style="margin-top:6px">Public app viser ferske rapporter fra siste 7 dager. Historikk ligger bare her.</p>
+              </div>
+              <span class="pill">Viser <?= count($reports) ?> av <?= h((string) $reportCount) ?></span>
+            </div>
+            <div class="card-body" style="padding-bottom:0">
+              <div class="subtabs">
+                <a class="button <?= $reportScope === 'fresh' ? 'tab-active' : '' ?>" href="/admin/?view=reports&reports=fresh">Ferske <?= h((string) $stats['reportsFresh']) ?></a>
+                <a class="button <?= $reportScope === 'old' ? 'tab-active' : '' ?>" href="/admin/?view=reports&reports=old">Eldre <?= h((string) $stats['reportsOld']) ?></a>
+                <a class="button <?= $reportScope === 'all' ? 'tab-active' : '' ?>" href="/admin/?view=reports&reports=all">Alle <?= h((string) $stats['reportsTotal']) ?></a>
+              </div>
+            </div>
             <div class="table-wrap">
               <table>
-                <thead><tr><th>Tid</th><th>Bruker</th><th>Sted</th><th>Vær</th><th>Temp</th><th>Koordinater</th><th>Handling</th></tr></thead>
+                <thead><tr><th>Status</th><th>Tid</th><th>Bruker</th><th>Sted</th><th>Vær</th><th>Temp</th><th>Koordinater</th><th>Handling</th></tr></thead>
                 <tbody>
                 <?php foreach ($reports as $report): ?>
+                  <?php $isFreshReport = (int) ($report['is_fresh'] ?? 0) === 1; ?>
                   <tr>
+                    <td><span class="pill <?= $isFreshReport ? 'status-fresh' : 'status-old' ?>"><?= $isFreshReport ? 'Fersk' : 'Historikk' ?> · <?= h(admin_report_age_label((string) $report['created_at'])) ?></span></td>
                     <td><?= h((string) $report['created_at']) ?></td>
                     <td><?= h((string) $report['username']) ?></td>
                     <td><?= h((string) $report['location']) ?></td>
@@ -615,6 +668,9 @@ if ($isLoggedIn) {
                     </td>
                   </tr>
                 <?php endforeach; ?>
+                <?php if (!$reports): ?>
+                  <tr><td colspan="8" class="muted">Ingen rapporter i dette filteret.</td></tr>
+                <?php endif; ?>
                 </tbody>
               </table>
             </div>

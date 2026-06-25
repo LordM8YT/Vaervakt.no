@@ -41,28 +41,58 @@ function vv_reports_get(PDO $pdo): void
     $lon = vv_float($_GET['lon'] ?? null);
     $radiusKm = max(1, min(100, (float) ($_GET['radiusKm'] ?? 25)));
     $location = trim((string) ($_GET['location'] ?? $_GET['q'] ?? ''));
+    $freshness = strtolower(trim((string) ($_GET['freshness'] ?? 'fresh')));
+    $requestedMaxAge = vv_float($_GET['maxAgeDays'] ?? null);
+    $maxAgeDays = $freshness === 'all' ? 0 : ($requestedMaxAge ?? 7.0);
+    $maxAgeDays = (int) max(0, min(365, round($maxAgeDays)));
     $terms = vv_location_terms($location);
 
-    $clauses = [];
-    $params = [];
+    $scopeClauses = [];
+    $scopeParams = [];
     $filtered = false;
 
     if ($lat !== null && $lon !== null && $lat >= -90 && $lat <= 90 && $lon >= -180 && $lon <= 180) {
-        $clauses[] = '(latitude IS NOT NULL AND longitude IS NOT NULL AND (6371 * ACOS(GREATEST(-1, LEAST(1, COS(RADIANS(?)) * COS(RADIANS(latitude)) * COS(RADIANS(longitude) - RADIANS(?)) + SIN(RADIANS(?)) * SIN(RADIANS(latitude)))))) <= ?)';
-        array_push($params, $lat, $lon, $lat, $radiusKm);
+        $scopeClauses[] = '(latitude IS NOT NULL AND longitude IS NOT NULL AND (6371 * ACOS(GREATEST(-1, LEAST(1, COS(RADIANS(?)) * COS(RADIANS(latitude)) * COS(RADIANS(longitude) - RADIANS(?)) + SIN(RADIANS(?)) * SIN(RADIANS(latitude)))))) <= ?)';
+        array_push($scopeParams, $lat, $lon, $lat, $radiusKm);
         $filtered = true;
     }
 
     foreach ($terms as $term) {
-        $clauses[] = 'LOWER(location) LIKE ?';
-        $params[] = '%' . $term . '%';
+        $scopeClauses[] = 'LOWER(location) LIKE ?';
+        $scopeParams[] = '%' . $term . '%';
         $filtered = true;
     }
 
-    $where = $clauses ? ' WHERE ' . implode(' OR ', $clauses) : '';
+    $clauses = [];
+    $params = [];
+    if ($scopeClauses) {
+        $clauses[] = '(' . implode(' OR ', $scopeClauses) . ')';
+        $params = $scopeParams;
+    }
+    if ($maxAgeDays > 0) {
+        $clauses[] = "created_at >= (NOW() - INTERVAL {$maxAgeDays} DAY)";
+        $filtered = true;
+    }
+
+    $where = $clauses ? ' WHERE ' . implode(' AND ', $clauses) : '';
+
     $stmt = $pdo->prepare("SELECT * FROM weather_reports{$where} ORDER BY created_at DESC LIMIT {$limit}");
     $stmt->execute($params);
     $rows = $stmt->fetchAll() ?: [];
+
+    $hiddenOldReports = 0;
+    if ($maxAgeDays > 0) {
+        $oldClauses = ["created_at < (NOW() - INTERVAL {$maxAgeDays} DAY)"];
+        $oldParams = [];
+        if ($scopeClauses) {
+            $oldClauses[] = '(' . implode(' OR ', $scopeClauses) . ')';
+            array_push($oldParams, ...$scopeParams);
+        }
+
+        $oldStmt = $pdo->prepare('SELECT COUNT(*) FROM weather_reports WHERE ' . implode(' AND ', $oldClauses));
+        $oldStmt->execute($oldParams);
+        $hiddenOldReports = (int) $oldStmt->fetchColumn();
+    }
 
     $reports = array_map(static function (array $row): array {
         $condition = (string) ($row['weather_condition'] ?? '');
@@ -74,6 +104,7 @@ function vv_reports_get(PDO $pdo): void
             'condition' => $condition,
             'location' => (string) ($row['location'] ?? ''),
             'temp' => round((float) ($row['temperature'] ?? 0)),
+            'createdAt' => (string) ($row['created_at'] ?? ''),
             'lat' => $row['latitude'] !== null ? (float) $row['latitude'] : null,
             'lon' => $row['longitude'] !== null ? (float) $row['longitude'] : null,
         ];
@@ -83,6 +114,11 @@ function vv_reports_get(PDO $pdo): void
         'success' => true,
         'filtered' => $filtered,
         'radiusKm' => $filtered ? $radiusKm : null,
+        'freshness' => [
+            'mode' => $maxAgeDays > 0 ? 'fresh' : 'all',
+            'maxAgeDays' => $maxAgeDays > 0 ? $maxAgeDays : null,
+            'hiddenOldReports' => $hiddenOldReports,
+        ],
         'reports' => $reports,
     ]);
 }

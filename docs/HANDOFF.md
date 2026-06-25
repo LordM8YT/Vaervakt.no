@@ -12,7 +12,7 @@ Backup av gammel app:
 - `static/`: Bygget React, CSS og JS fra `Vaervakt-react`.
 - `api/bootstrap.php`: Felles konfig, `.env`, PDO og helpers.
 - `api/weather.php`: MET-varsel og valgfri Yr badetemperatur for visning.
-- `api/reports.php`: Lokale værrapporter.
+- `api/reports.php`: Lokale værrapporter. Public GET viser som standard bare rapporter fra siste 7 dager; bruk `freshness=all` eller `maxAgeDays=0` for historikk.
 - `api/glimpses.php`: Værglimt med bilde, levetid og automatisk utløp.
 - `api/bath-reports.php`: Innsending av badetemperaturer, lokal logging og forwarding til Yr.
 - `api/track.php`: Anonym besøkslogging for admin-statistikk.

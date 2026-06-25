@@ -63,17 +63,6 @@
     return Number.isFinite(Number(report.lat)) && Number.isFinite(Number(report.lon));
   }
 
-  function mapPoint(report, bounds) {
-    const lat = Number(report.lat);
-    const lon = Number(report.lon);
-    const x = ((lon - bounds.west) / (bounds.east - bounds.west)) * 100;
-    const y = ((bounds.north - lat) / (bounds.north - bounds.south)) * 100;
-    return {
-      x: Math.max(4, Math.min(96, x)),
-      y: Math.max(6, Math.min(94, y)),
-    };
-  }
-
   function mapBounds(center, reports) {
     const coords = [
       [center.lat, center.lon],
@@ -100,6 +89,10 @@
       .map((value) => value.toFixed(6))
       .join(",");
     return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${center.lat.toFixed(6)},${center.lon.toFixed(6)}`;
+  }
+
+  function osmPointUrl(lat, lon) {
+    return `https://www.openstreetmap.org/?mlat=${Number(lat).toFixed(6)}&mlon=${Number(lon).toFixed(6)}#map=15/${Number(lat).toFixed(6)}/${Number(lon).toFixed(6)}`;
   }
 
   function renderMapPanel() {
@@ -171,7 +164,6 @@
           color: #06111f;
         }
         .vv-map-wrap {
-          position: relative;
           height: clamp(220px, 42vw, 330px);
           background: #0b1224;
           border-top: 1px solid rgba(255,255,255,.07);
@@ -183,27 +175,47 @@
           display: block;
           filter: saturate(.78) contrast(.92) brightness(.82);
         }
-        .vv-map-pin {
-          position: absolute;
-          transform: translate(-50%, -50%);
-          width: 28px;
-          height: 28px;
-          border-radius: 999px;
-          display: grid;
-          place-items: center;
-          border: 2px solid rgba(255,255,255,.86);
-          background: #38bdf8;
-          color: #06111f;
-          box-shadow: 0 10px 22px rgba(2,6,23,.35);
-          font-size: 14px;
-          font-weight: 900;
-        }
-        .vv-map-pin[data-type="report"] { background: #fbbf24; }
         .vv-map-empty {
           padding: 0 14px 14px;
           color: rgba(255,255,255,.62);
           font: 500 .78rem Poppins, system-ui, sans-serif;
         }
+        .vv-map-report-list {
+          border-top: 1px solid rgba(255,255,255,.07);
+          display: grid;
+          gap: 8px;
+          padding: 10px 14px 14px;
+        }
+        .vv-map-report {
+          align-items: center;
+          display: flex;
+          gap: 10px;
+          justify-content: space-between;
+        }
+        .vv-map-report span {
+          color: rgba(255,255,255,.78);
+          font: 700 .76rem Poppins, system-ui, sans-serif;
+          min-width: 0;
+        }
+        .vv-map-report small {
+          color: rgba(255,255,255,.46);
+          display: block;
+          font-weight: 500;
+          margin-top: 2px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .vv-map-report a {
+          border: 1px solid rgba(255,255,255,.12);
+          border-radius: 999px;
+          color: rgba(255,255,255,.82);
+          flex: 0 0 auto;
+          font: 800 .68rem Poppins, system-ui, sans-serif;
+          padding: 6px 9px;
+          text-decoration: none;
+        }
+        .vv-map-report a:hover { background: rgba(255,255,255,.08); }
         .vv-history-list {
           border-top: 1px solid rgba(255,255,255,.07);
           padding: 10px 14px 14px;
@@ -237,13 +249,8 @@
       ${state.mapOpen ? `
         <div class="vv-map-wrap">
           <iframe title="Kart over lokale værrapporter" loading="lazy" src="${mapUrl(bounds, state.location)}"></iframe>
-          <span class="vv-map-pin" style="left:50%;top:50%" title="${escapeHtml(state.location.name)}">•</span>
-          ${reportsWithCoords.map((report) => {
-            const point = mapPoint(report, bounds);
-            return `<span class="vv-map-pin" data-type="report" style="left:${point.x}%;top:${point.y}%" title="${escapeHtml(`${report.condition} · ${report.location} · ${report.time}`)}">${escapeHtml(report.icon || "•")}</span>`;
-          }).join("")}
         </div>
-        ${reportsWithCoords.length ? "" : `<div class="vv-map-empty">Ingen ferske rapporter med koordinater her akkurat nå. Kartet viser valgt sted, og nye rapporter dukker opp som punkter.</div>`}
+        ${reportsWithCoords.length ? renderMapReportList(reportsWithCoords) : `<div class="vv-map-empty">Ingen ferske rapporter med koordinater her akkurat nå. Kartet viser valgt sted, og nye rapporter dukker opp her.</div>`}
       ` : ""}
       ${state.historyOpen ? renderHistoryList() : ""}
     `;
@@ -276,6 +283,19 @@
           <div class="vv-history-item">
             <span>${escapeHtml(report.icon || "")} ${escapeHtml(report.condition)}<small>${escapeHtml(report.reporter)} · ${escapeHtml(report.location)} · ${escapeHtml(report.time)}</small></span>
             <strong>${escapeHtml(report.temp)}°</strong>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function renderMapReportList(reports) {
+    return `
+      <div class="vv-map-report-list">
+        ${reports.slice(0, 6).map((report) => `
+          <div class="vv-map-report">
+            <span>${escapeHtml(report.icon || "")} ${escapeHtml(report.condition)}<small>${escapeHtml(report.location)} · ${escapeHtml(report.time)}</small></span>
+            <a href="${osmPointUrl(report.lat, report.lon)}" target="_blank" rel="noreferrer">Åpne</a>
           </div>
         `).join("")}
       </div>

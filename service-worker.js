@@ -1,10 +1,10 @@
-const CACHE_NAME = "vaervakt-shell-v4";
+const CACHE_NAME = "vaervakt-shell-v6";
 const SHELL_ASSETS = [
   "/",
   "/manifest.json",
   "/weather.png",
   "/weather.ico",
-  "/assets/js/live-enhancements.js?v=4",
+  "/assets/js/live-enhancements.js?v=6",
   "/static/css/main.5b25ea17.css",
   "/static/js/main.2f75c514.js",
 ];

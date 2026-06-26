@@ -1,7 +1,12 @@
 (function () {
   const favoriteKey = "vaervakt_favorite_locations";
+  const autoLocationKey = "vaervakt_auto_location";
+  const autoReloadKey = "vaervakt_auto_location_reload";
+  const defaultLat = 58.1467;
+  const defaultLon = 7.9956;
   const state = {
     location: null,
+    autoLocation: readAutoLocation(),
     reports: [],
     freshness: null,
     historyOpen: false,
@@ -16,6 +21,27 @@
 
   const originalFetch = window.fetch ? window.fetch.bind(window) : null;
   if (!originalFetch) return;
+
+  function readAutoLocation() {
+    try {
+      const item = JSON.parse(localStorage.getItem(autoLocationKey) || "null");
+      if (!item || !Number.isFinite(Number(item.lat)) || !Number.isFinite(Number(item.lon))) return null;
+      return {
+        lat: Number(item.lat),
+        lon: Number(item.lon),
+        name: item.name || "Din posisjon",
+        accuracy: Number(item.accuracy) || null,
+        savedAt: Number(item.savedAt) || 0,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function setAutoLocation(location) {
+    state.autoLocation = location;
+    localStorage.setItem(autoLocationKey, JSON.stringify(location));
+  }
 
   function parseUrl(input) {
     try {
@@ -34,14 +60,50 @@
     return url && url.pathname.endsWith("/api/weather.php");
   }
 
+  function shouldPatchLocation(url) {
+    if (!url || !state.autoLocation) return false;
+    const lat = Number(url.searchParams.get("lat"));
+    const lon = Number(url.searchParams.get("lon"));
+    return Number.isFinite(lat) && Number.isFinite(lon) && isDefaultCoords(lat, lon);
+  }
+
+  function patchLocationUrl(url) {
+    if (!shouldPatchLocation(url)) return url;
+    const next = new URL(url.toString());
+    next.searchParams.set("lat", String(state.autoLocation.lat));
+    next.searchParams.set("lon", String(state.autoLocation.lon));
+    if (next.searchParams.has("location")) next.searchParams.set("location", state.autoLocation.name);
+    return next;
+  }
+
+  function patchRequestBody(input, init, url) {
+    if (!state.autoLocation || !url || !init || !init.body || typeof init.body !== "string") return { input, init };
+    const isWrite = ["/api/reports.php", "/api/hub.php"].some((path) => url.pathname.endsWith(path));
+    if (!isWrite) return { input, init };
+
+    try {
+      const payload = JSON.parse(init.body);
+      if (isDefaultCoords(payload.lat, payload.lon)) {
+        payload.lat = state.autoLocation.lat;
+        payload.lon = state.autoLocation.lon;
+        payload.location = state.autoLocation.name;
+        return { input, init: { ...init, body: JSON.stringify(payload) } };
+      }
+    } catch {
+      return { input, init };
+    }
+    return { input, init };
+  }
+
   function rememberLocation(url) {
     const lat = Number(url.searchParams.get("lat"));
     const lon = Number(url.searchParams.get("lon"));
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    const auto = state.autoLocation;
     state.location = {
-      lat,
-      lon,
-      name: url.searchParams.get("location") || readPlaceName() || "Valgt sted",
+      lat: auto && isDefaultCoords(lat, lon) ? auto.lat : lat,
+      lon: auto && isDefaultCoords(lat, lon) ? auto.lon : lon,
+      name: auto && isDefaultCoords(lat, lon) ? auto.name : (url.searchParams.get("location") || readPlaceName() || "Valgt sted"),
       radiusKm: Number(url.searchParams.get("radiusKm")) || 35,
     };
   }
@@ -131,8 +193,68 @@
       .some((element) => visibleText(element).includes("Kristiansand"));
   }
 
+  function isDefaultCoords(lat, lon) {
+    return Math.abs(Number(lat) - defaultLat) < 0.02 && Math.abs(Number(lon) - defaultLon) < 0.02;
+  }
+
+  function positionOnce({ targetAccuracy = 35, settleMs = 5500, timeout = 12000 } = {}) {
+    return new Promise((resolve, reject) => {
+      let best = null;
+      let settled = false;
+      let watchId = 0;
+      const finish = (callback, value) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeoutId);
+        window.clearTimeout(settleId);
+        if (watchId) navigator.geolocation.clearWatch(watchId);
+        callback(value);
+      };
+      const timeoutId = window.setTimeout(() => {
+        if (best) finish(resolve, best);
+        else finish(reject, new Error("timeout"));
+      }, timeout);
+      const settleId = window.setTimeout(() => {
+        if (best) finish(resolve, best);
+      }, settleMs);
+      watchId = navigator.geolocation.watchPosition((position) => {
+        if (!best || position.coords.accuracy < best.coords.accuracy) best = position;
+        if (position.coords.accuracy <= targetAccuracy) finish(resolve, position);
+      }, (error) => {
+        if (best) finish(resolve, best);
+        else finish(reject, error);
+      }, { enableHighAccuracy: true, timeout, maximumAge: 0 });
+    });
+  }
+
+  async function reverseGeocode(lat, lon) {
+    try {
+      const payload = await originalFetch(`/api/geocode.php?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`).then((response) => response.json());
+      return payload && payload.result && payload.result.name ? payload.result.name : "Din posisjon";
+    } catch {
+      return "Din posisjon";
+    }
+  }
+
+  function applyAutoLocationToPage() {
+    const auto = state.autoLocation;
+    if (!auto) return;
+    document.querySelectorAll("h2,h3,p,span").forEach((element) => {
+      if (element.childElementCount === 0 && visibleText(element).includes("Kristiansand")) {
+        element.textContent = element.textContent.replace(/Kristiansand,\s*NO|Kristiansand/g, auto.name);
+      }
+    });
+  }
+
   async function autoLocate() {
     if (state.autoLocateAttempted || !("geolocation" in navigator)) return;
+
+    if (state.autoLocation && Date.now() - state.autoLocation.savedAt < 1000 * 60 * 60 * 12) {
+      applyAutoLocationToPage();
+      return;
+    }
+    if (!isDefaultLocationVisible()) return;
+
     state.autoLocateAttempted = true;
 
     try {
@@ -144,10 +266,24 @@
       // Some browsers do not support querying geolocation permission. The app button handles that path.
     }
 
-    const button = Array.from(document.querySelectorAll("button"))
-      .find((item) => visibleText(item) === "Bruk posisjon");
-    if (!button || !isDefaultLocationVisible()) return;
-    button.click();
+    try {
+      const position = await positionOnce({ targetAccuracy: 25, settleMs: 6500, timeout: 14000 });
+      const lat = Number(position.coords.latitude.toFixed(7));
+      const lon = Number(position.coords.longitude.toFixed(7));
+      const name = await reverseGeocode(lat, lon);
+      setAutoLocation({ lat, lon, name, accuracy: position.coords.accuracy, savedAt: Date.now() });
+      if (!sessionStorage.getItem(autoReloadKey)) {
+        sessionStorage.setItem(autoReloadKey, "1");
+        window.location.reload();
+        return;
+      }
+      applyAutoLocationToPage();
+      scheduleRender();
+    } catch {
+      const button = Array.from(document.querySelectorAll("button"))
+        .find((item) => visibleText(item) === "Bruk posisjon");
+      if (button && isDefaultLocationVisible()) button.click();
+    }
   }
 
   function renderUtilityPanel() {
@@ -369,6 +505,7 @@
     window.clearTimeout(scheduleRender.timer);
     scheduleRender.timer = window.setTimeout(() => {
       improveEmptyReportCopy();
+      applyAutoLocationToPage();
       autoLocate();
       renderUtilityPanel();
       loadWeatherForTools();
@@ -378,17 +515,20 @@
 
   window.fetch = async function vvEnhancedFetch(input, init) {
     const url = parseUrl(input);
-    const response = await originalFetch(input, init);
-    if (isWeatherUrl(url)) {
+    const patchedUrl = patchLocationUrl(url);
+    const patchedInput = patchedUrl !== url && typeof input === "string" ? patchedUrl.toString() : input;
+    const patchedRequest = patchRequestBody(patchedInput, init, patchedUrl);
+    const response = await originalFetch(patchedRequest.input, patchedRequest.init);
+    if (isWeatherUrl(patchedUrl)) {
       response.clone().json().then((payload) => {
         state.weather = payload || null;
         scheduleRender();
       }).catch(() => {});
     }
-    if (isReportsUrl(url) && (!init || !init.method || String(init.method).toUpperCase() === "GET")) {
-      rememberLocation(url);
+    if (isReportsUrl(patchedUrl) && (!init || !init.method || String(init.method).toUpperCase() === "GET")) {
+      rememberLocation(patchedUrl);
       response.clone().json().then((payload) => {
-        if (url.searchParams.get("freshness") === "all") return;
+        if (patchedUrl.searchParams.get("freshness") === "all") return;
         state.reports = Array.isArray(payload.reports) ? payload.reports : [];
         state.freshness = payload.freshness || null;
         scheduleRender();

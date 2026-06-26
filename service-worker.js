@@ -1,11 +1,14 @@
-const CACHE_NAME = "vaervakt-shell-v9";
+const CACHE_NAME = "vaervakt-shell-v10";
 const SHELL_ASSETS = [
   "/",
+  "/lokalt/",
+  "/bad/",
+  "/glimt/",
   "/manifest.json",
   "/weather.png",
   "/weather.ico",
   "/assets/js/live-enhancements.js?v=6",
-  "/assets/js/app-tabs.js?v=1",
+  "/assets/js/app-tabs.js?v=2",
   "/static/css/main.5b25ea17.css",
   "/static/js/main.2f75c514.js",
 ];

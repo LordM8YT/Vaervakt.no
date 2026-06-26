@@ -77,7 +77,8 @@
       }
       [data-vv-page-hidden="true"],
       [data-vv-community-hidden="true"],
-      [data-vv-community-child-hidden="true"] { display: none !important; }
+      [data-vv-community-child-hidden="true"],
+      [data-vv-weather-shell-hidden="true"] { display: none !important; }
     `;
     document.head.appendChild(style);
   }
@@ -143,6 +144,32 @@
     });
   }
 
+  function applyWeatherShellMode(sectionsByPage) {
+    const community = closestCommonCommunity(sectionsByPage);
+    const mainGrid = community && community.parentElement;
+    if (!mainGrid) return;
+
+    Array.from(mainGrid.children).forEach((child) => {
+      if (child.contains(document.getElementById("vv-app-nav"))) return;
+      if (child === community) return;
+
+      const content = text(child);
+      const isHeader = child.querySelector("img, input") || content.includes("Bruk posisjon");
+      const isWeatherPanel = content.includes("FØLES SOM")
+        || content.includes("VIND")
+        || content.includes("NESTE DAGER")
+        || content.includes("I DAG");
+
+      if (isHeader) {
+        child.setAttribute("data-vv-weather-shell-hidden", "false");
+        return;
+      }
+      if (isWeatherPanel) {
+        child.setAttribute("data-vv-weather-shell-hidden", activePage === "weather" ? "false" : "true");
+      }
+    });
+  }
+
   function setPage(page, options) {
     activePage = labels[page] ? page : "weather";
     localStorage.setItem(pageKey, activePage);
@@ -181,6 +208,7 @@
       section.setAttribute("data-vv-page-hidden", activePage === page ? "false" : "true");
     });
     applyCommunityMode(sectionsByPage);
+    applyWeatherShellMode(sectionsByPage);
   }
 
   function tick() {

@@ -131,14 +131,14 @@
     if (!community) return;
 
     community.setAttribute("data-vv-community", "true");
-    community.setAttribute("data-vv-community-hidden", activePage === "weather" ? "true" : "false");
+    community.setAttribute("data-vv-community-hidden", "false");
 
     const activeSection = sectionsByPage[activePage];
-    const stack = activeSection && activeSection.parentElement;
+    const stack = (activeSection && activeSection.parentElement) || Object.values(sectionsByPage).find(Boolean)?.parentElement;
     if (!stack) return;
 
     Array.from(stack.children).forEach((child) => {
-      const keep = activePage !== "weather" && child === activeSection;
+      const keep = activePage === "weather" ? text(child).includes("Vipps") : child === activeSection;
       child.setAttribute("data-vv-community-child-hidden", keep ? "false" : "true");
     });
   }

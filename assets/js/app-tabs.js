@@ -1,10 +1,10 @@
 (function () {
   const pageKey = "vaervakt_active_page";
   const pages = [
-    ["weather", "Vaer"],
-    ["local", "Lokalt"],
-    ["bath", "Bad"],
-    ["glimpses", "Glimt"],
+    ["weather", "/"],
+    ["local", "/lokalt/"],
+    ["bath", "/bad/"],
+    ["glimpses", "/glimt/"],
   ];
   const labels = {
     weather: "Vær",
@@ -12,8 +12,24 @@
     bath: "Bad",
     glimpses: "Glimt",
   };
+  const routePages = {
+    "/": "weather",
+    "/index.html": "weather",
+    "/lokalt/": "local",
+    "/lokalt/index.html": "local",
+    "/bad/": "bath",
+    "/bad/index.html": "bath",
+    "/glimt/": "glimpses",
+    "/glimt/index.html": "glimpses",
+  };
 
-  let activePage = localStorage.getItem(pageKey) || "weather";
+  let activePage = routePage() || localStorage.getItem(pageKey) || "weather";
+
+  function routePage() {
+    const fromQuery = new URLSearchParams(window.location.search).get("page");
+    if (labels[fromQuery]) return fromQuery;
+    return routePages[window.location.pathname] || "";
+  }
 
   function text(element) {
     return String((element && element.textContent) || "").trim().replace(/\s+/g, " ");
@@ -43,6 +59,9 @@
       }
       .vv-app-tab {
         appearance: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         min-height: 40px;
         border: 0;
         border-radius: 999px;
@@ -50,6 +69,7 @@
         color: rgba(255,255,255,.62);
         cursor: pointer;
         font: 900 .73rem Poppins, system-ui, sans-serif;
+        text-decoration: none;
       }
       .vv-app-tab[data-active="true"] {
         background: #38bdf8;
@@ -95,12 +115,12 @@
     };
   }
 
-  function setPage(page) {
+  function setPage(page, options) {
     activePage = labels[page] ? page : "weather";
     localStorage.setItem(pageKey, activePage);
     render();
     applyVisibility();
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (!options || !options.keepScroll) window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function render() {
@@ -113,18 +133,11 @@
       nav = document.createElement("nav");
       nav.id = "vv-app-nav";
     }
-    if (!nav.__vvTabsBound) {
-      nav.addEventListener("click", (event) => {
-        const button = event.target && event.target.closest ? event.target.closest("[data-vv-page]") : null;
-        if (button) setPage(button.getAttribute("data-vv-page"));
-      });
-      nav.__vvTabsBound = true;
-    }
     if (nav.parentElement !== root || root.firstElementChild !== nav) root.prepend(nav);
 
-    const html = pages.map(([key]) => {
+    const html = pages.map(([key, href]) => {
       const isActive = activePage === key;
-      return `<button class="vv-app-tab" type="button" data-vv-page="${key}" data-active="${isActive ? "true" : "false"}" aria-current="${isActive ? "page" : "false"}">${labels[key]}</button>`;
+      return `<a class="vv-app-tab" href="${href}" data-vv-page="${key}" data-active="${isActive ? "true" : "false"}" aria-current="${isActive ? "page" : "false"}">${labels[key]}</a>`;
     }).join("");
     if (nav.__vvTabsHtml !== html) {
       nav.innerHTML = html;
@@ -149,6 +162,7 @@
   }
 
   document.addEventListener("DOMContentLoaded", () => {
+    setPage(routePage() || activePage, { keepScroll: true });
     render();
     applyVisibility();
     new MutationObserver(tick).observe(document.body, { childList: true, subtree: true });

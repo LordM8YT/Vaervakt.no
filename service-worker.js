@@ -1,4 +1,4 @@
-const CACHE_NAME = "vaervakt-shell-v13";
+const CACHE_NAME = "vaervakt-shell-v14";
 const SHELL_ASSETS = [
   "/",
   "/lokalt/",
@@ -8,7 +8,7 @@ const SHELL_ASSETS = [
   "/weather.png",
   "/weather.ico",
   "/assets/js/live-enhancements.js?v=6",
-  "/assets/js/app-tabs.js?v=5",
+  "/assets/js/app-tabs.js?v=6",
   "/static/css/main.5b25ea17.css",
   "/static/js/main.2f75c514.js",
 ];

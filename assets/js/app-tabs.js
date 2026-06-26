@@ -75,7 +75,9 @@
         background: #38bdf8;
         color: #06111f;
       }
-      [data-vv-page-hidden="true"] { display: none !important; }
+      [data-vv-page-hidden="true"],
+      [data-vv-community-hidden="true"],
+      [data-vv-community-child-hidden="true"] { display: none !important; }
     `;
     document.head.appendChild(style);
   }
@@ -115,6 +117,32 @@
     };
   }
 
+  function closestCommonCommunity(sectionsByPage) {
+    const found = Object.values(sectionsByPage).filter(Boolean);
+    if (!found.length) return null;
+    const section = found[0];
+    const stack = section.parentElement;
+    if (!stack) return null;
+    return stack.parentElement || stack;
+  }
+
+  function applyCommunityMode(sectionsByPage) {
+    const community = closestCommonCommunity(sectionsByPage);
+    if (!community) return;
+
+    community.setAttribute("data-vv-community", "true");
+    community.setAttribute("data-vv-community-hidden", activePage === "weather" ? "true" : "false");
+
+    const activeSection = sectionsByPage[activePage];
+    const stack = activeSection && activeSection.parentElement;
+    if (!stack) return;
+
+    Array.from(stack.children).forEach((child) => {
+      const keep = activePage !== "weather" && child === activeSection;
+      child.setAttribute("data-vv-community-child-hidden", keep ? "false" : "true");
+    });
+  }
+
   function setPage(page, options) {
     activePage = labels[page] ? page : "weather";
     localStorage.setItem(pageKey, activePage);
@@ -146,11 +174,13 @@
   }
 
   function applyVisibility() {
-    Object.entries(sections()).forEach(([page, section]) => {
+    const sectionsByPage = sections();
+    Object.entries(sectionsByPage).forEach(([page, section]) => {
       if (!section) return;
       section.setAttribute("data-vv-section", page);
       section.setAttribute("data-vv-page-hidden", activePage === page ? "false" : "true");
     });
+    applyCommunityMode(sectionsByPage);
   }
 
   function tick() {

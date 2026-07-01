@@ -38,53 +38,25 @@ function showToast(message) {
   showToast.timer = window.setTimeout(() => toast.classList.remove('is-visible'), 3200);
 }
 
-function formatAccuracySuffix(accuracy) {
-  if (!Number.isFinite(accuracy)) return '';
-  if (accuracy < 1000) return ` (ca. ${Math.round(accuracy)} m)`;
-  return ` (ca. ${(accuracy / 1000).toFixed(1).replace('.', ',')} km)`;
+function getPositionStatusMessage(error) {
+  if (error?.message === 'unsupported') return 'Nettleseren støtter ikke posisjon.';
+  if (error?.code === 1) return 'Posisjon er avslått. Søk etter sted i stedet.';
+  if (error?.code === 2) return 'Fant ikke posisjonen akkurat nå. Prøv igjen eller søk etter sted.';
+  if (error?.code === 3 || error?.message === 'timeout') return 'Posisjon brukte for lang tid. Prøv igjen eller søk etter sted.';
+  return 'Kunne ikke hente posisjon. Søk etter sted i stedet.';
 }
 
-function requestBestPosition({ targetAccuracy = 35, settleMs = 6500, timeout = 12000 } = {}) {
+function requestBestPosition({ timeout = 10000 } = {}) {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error('unsupported'));
       return;
     }
 
-    let bestPosition = null;
-    let settled = false;
-    let watchId = 0;
-
-    const finish = (callback, value) => {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timeoutId);
-      window.clearTimeout(settleId);
-      if (watchId) navigator.geolocation.clearWatch(watchId);
-      callback(value);
-    };
-
-    const timeoutId = window.setTimeout(() => {
-      if (bestPosition) finish(resolve, bestPosition);
-      else finish(reject, new Error('timeout'));
-    }, timeout);
-
-    const settleId = window.setTimeout(() => {
-      if (bestPosition) finish(resolve, bestPosition);
-    }, settleMs);
-
-    watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        if (!bestPosition || position.coords.accuracy < bestPosition.coords.accuracy) {
-          bestPosition = position;
-        }
-        if (position.coords.accuracy <= targetAccuracy) finish(resolve, position);
-      },
-      (error) => {
-        if (bestPosition) finish(resolve, bestPosition);
-        else finish(reject, error);
-      },
-      { enableHighAccuracy: true, timeout, maximumAge: 0 },
+    navigator.geolocation.getCurrentPosition(
+      resolve,
+      reject,
+      { enableHighAccuracy: true, timeout, maximumAge: 60000 },
     );
   });
 }
@@ -320,9 +292,9 @@ function bindLocation() {
 
   $('#use-location')?.addEventListener('click', async () => {
     if (!navigator.geolocation) return showToast('Nettleseren støtter ikke posisjon.');
-    showToast('Finner posisjonen din mer nøyaktig...');
+    showToast('Finner posisjonen din...');
     try {
-      const position = await requestBestPosition({ targetAccuracy: 25, settleMs: 7500, timeout: 14000 });
+      const position = await requestBestPosition({ timeout: 10000 });
       const lat = Number(position.coords.latitude.toFixed(7));
       const lon = Number(position.coords.longitude.toFixed(7));
       try {
@@ -337,9 +309,9 @@ function bindLocation() {
           source: 'user',
         });
       }
-      showToast(`Viser ${state.location.name}${formatAccuracySuffix(position.coords.accuracy)}.`);
-    } catch {
-      showToast('Kunne ikke hente posisjon.');
+      showToast(`Viser ${state.location.name}.`);
+    } catch (error) {
+      showToast(getPositionStatusMessage(error));
     }
   });
 }
@@ -475,13 +447,14 @@ async function init() {
   renderProfile();
   await refreshAll();
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+    navigator.serviceWorker.register('/service-worker.js', { updateViaCache: 'none' })
+      .then((registration) => registration.update().catch(() => {}))
+      .catch(() => {});
   }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
   init().catch((error) => {
-    console.error(error);
     showToast('Kunne ikke starte Værvakt helt riktig.');
   });
 });

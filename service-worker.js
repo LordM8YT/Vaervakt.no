@@ -1,4 +1,4 @@
-const CACHE_NAME = "vaervakt-shell-v17";
+const CACHE_NAME = "vaervakt-shell-v20";
 const SHELL_ASSETS = [
   "/",
   "/lokalt/",
@@ -7,9 +7,11 @@ const SHELL_ASSETS = [
   "/manifest.json",
   "/weather.png",
   "/weather.ico",
-  "/assets/js/live-enhancements.js?v=6",
+  "/assets/js/live-enhancements.js?v=9",
+  "/assets/js/app.js",
+  "/assets/js/app-tabs.js",
   "/static/css/main.5b25ea17.css",
-  "/static/js/main.3813fe31.js",
+  "/static/js/main.66b94c85.js",
 ];
 
 self.addEventListener("install", (event) => {
@@ -34,6 +36,21 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
   const url = new URL(request.url);
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/admin/")) return;
+
+  if (request.mode === "navigate") {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok && url.origin === self.location.origin) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone)).catch(() => {});
+          }
+          return response;
+        })
+        .catch(() => caches.match(request).then((cached) => cached || caches.match("/"))),
+    );
+    return;
+  }
 
   event.respondWith(
     caches.match(request).then((cached) => {

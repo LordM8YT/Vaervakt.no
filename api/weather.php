@@ -89,32 +89,54 @@ function vv_fetch_bath(float $lat, float $lon): ?array
     }
 }
 
-function vv_nearest_bath(array $items, float $lat, float $lon): ?array
+function vv_normalize_bath_item(array $item, float $lat, float $lon): ?array
 {
-    $best = null;
+    $position = is_array($item['position'] ?? null) ? $item['position'] : [];
+    $itemLat = vv_float($item['latitude'] ?? $item['lat'] ?? $position['lat'] ?? null);
+    $itemLon = vv_float($item['longitude'] ?? $item['lon'] ?? $position['lon'] ?? null);
+    $temp = vv_float($item['temperature'] ?? $item['waterTemperature'] ?? null);
+
+    if ($itemLat === null || $itemLon === null || $temp === null) {
+        return null;
+    }
+
+    return [
+        'locationId' => (string) ($item['locationId'] ?? $item['id'] ?? ''),
+        'name' => (string) ($item['locationName'] ?? $item['name'] ?? 'Badeplass'),
+        'municipality' => (string) ($item['municipality'] ?? ''),
+        'county' => (string) ($item['county'] ?? ''),
+        'temperature' => $temp,
+        'time' => (string) ($item['time'] ?? $item['registeredTime'] ?? ''),
+        'lat' => $itemLat,
+        'lon' => $itemLon,
+        'heatedWater' => (bool) ($item['heatedWater'] ?? false),
+        'distanceKm' => round(vv_distance_km($lat, $lon, $itemLat, $itemLon), 1),
+        'credit' => 'Badetemperaturer levert av Yr',
+    ];
+}
+
+function vv_nearby_baths(array $items, float $lat, float $lon, int $limit = 6): array
+{
+    $nearby = [];
     foreach ($items as $item) {
         if (!is_array($item)) {
             continue;
         }
-        $itemLat = vv_float($item['latitude'] ?? $item['lat'] ?? null);
-        $itemLon = vv_float($item['longitude'] ?? $item['lon'] ?? null);
-        $temp = vv_float($item['temperature'] ?? $item['waterTemperature'] ?? null);
-        if ($itemLat === null || $itemLon === null || $temp === null) {
-            continue;
-        }
-        $distance = vv_distance_km($lat, $lon, $itemLat, $itemLon);
-        if ($best === null || $distance < $best['distanceKm']) {
-            $best = [
-                'name' => (string) ($item['locationName'] ?? $item['name'] ?? 'Badeplass'),
-                'municipality' => (string) ($item['municipality'] ?? ''),
-                'temperature' => $temp,
-                'time' => (string) ($item['time'] ?? $item['registeredTime'] ?? ''),
-                'distanceKm' => round($distance, 1),
-                'credit' => 'Badetemperaturer levert av Yr',
-            ];
+
+        $normalized = vv_normalize_bath_item($item, $lat, $lon);
+        if ($normalized !== null) {
+            $nearby[] = $normalized;
         }
     }
-    return $best;
+
+    usort($nearby, static fn (array $a, array $b): int => $a['distanceKm'] <=> $b['distanceKm']);
+    return array_slice($nearby, 0, $limit);
+}
+
+function vv_nearest_bath(array $items, float $lat, float $lon): ?array
+{
+    $nearby = vv_nearby_baths($items, $lat, $lon, 1);
+    return $nearby[0] ?? null;
 }
 
 try {
@@ -200,7 +222,8 @@ try {
 
     $bathRaw = vv_fetch_bath($lat, $lon);
     $bathItems = is_array($bathRaw) ? ($bathRaw['data'] ?? $bathRaw['items'] ?? $bathRaw) : [];
-    $bath = is_array($bathItems) ? vv_nearest_bath($bathItems, $lat, $lon) : null;
+    $nearbyBaths = is_array($bathItems) ? vv_nearby_baths($bathItems, $lat, $lon) : [];
+    $bath = $nearbyBaths[0] ?? null;
     $bathScore = max(0, min(100, (int) round(($temperature * 3.2) - ($wind * 4) - ($rainNextHour * 15) + ($bath['temperature'] ?? 0))));
 
     vv_json([
@@ -236,6 +259,7 @@ try {
             'waterTemperatureTime' => $bath['time'] ?? null,
             'waterTemperatureDistanceKm' => $bath['distanceKm'] ?? null,
             'credit' => $bath['credit'] ?? null,
+            'nearby' => $nearbyBaths,
             'source' => $bath ? 'Yr badetemperatur + MET-varsel' : 'Beregnet fra MET-varsel. Yr badetemperatur kobles på når nøkkel/data er klar.',
         ],
     ], 200, 'public, max-age=300');

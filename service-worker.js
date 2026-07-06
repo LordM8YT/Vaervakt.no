@@ -1,4 +1,4 @@
-const CACHE_NAME = "vaervakt-shell-v21";
+const CACHE_NAME = "vaervakt-shell-v22";
 const SHELL_ASSETS = [
   "/",
   "/lokalt/",
@@ -7,11 +7,11 @@ const SHELL_ASSETS = [
   "/manifest.json",
   "/weather.png",
   "/weather.ico",
-  "/assets/js/live-enhancements.js?v=10",
+  "/assets/js/live-enhancements.js?v=11",
   "/assets/js/app.js",
   "/assets/js/app-tabs.js",
   "/static/css/main.b781c170.css",
-  "/static/js/main.5329c813.js",
+  "/static/js/main.4dc4ecc4.js",
 ];
 
 self.addEventListener("install", (event) => {

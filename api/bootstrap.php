@@ -109,9 +109,25 @@ define('SUPPORT_URL', vv_env('SUPPORT_URL', 'https://betal.vipps.no/opy01u'));
 define('SUPPORT_LABEL', vv_env('SUPPORT_LABEL', 'Støtt med Vipps'));
 define('VAPID_PUBLIC', vv_env_first(['VAPID_PUBLIC', 'VAPID_PUBLIC_KEY', 'VAPID_PUBLICKEY', 'WEB_PUSH_PUBLIC_KEY']));
 
+function vv_send_cors_headers(): void
+{
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+    header('Access-Control-Allow-Headers: Accept, Content-Type');
+    header('Access-Control-Max-Age: 86400');
+}
+
+vv_send_cors_headers();
+
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+    http_response_code(204);
+    exit;
+}
+
 function vv_json(array $data, int $status = 200, string $cacheControl = 'no-store'): void
 {
     http_response_code($status);
+    vv_send_cors_headers();
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: ' . $cacheControl);
     echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

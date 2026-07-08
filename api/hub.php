@@ -245,6 +245,17 @@ function vv_hub_vote(PDO $pdo, array $input): void
     if ($postId <= 0 || !in_array($vote, [-1, 0, 1], true)) {
         vv_error('Ugyldig stemme.');
     }
+
+    $postStmt = $pdo->prepare('SELECT user_id FROM weather_hub_posts WHERE id = ? LIMIT 1');
+    $postStmt->execute([$postId]);
+    $post = $postStmt->fetch();
+    if (!$post) {
+        vv_error('Fant ikke innlegget.', 404);
+    }
+    if ($vote !== 0 && $post['user_id'] !== null && (int) $post['user_id'] === (int) $user['id']) {
+        vv_error('Du kan ikke stemme på ditt eget innlegg.', 403);
+    }
+
     $hash = hash('sha256', 'vv2-vote|' . (int) $user['id']);
     if ($vote === 0) {
         $pdo->prepare('DELETE FROM weather_hub_votes WHERE post_id = ? AND voter_hash = ?')->execute([$postId, $hash]);

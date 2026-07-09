@@ -113,7 +113,7 @@ function vv_send_cors_headers(): void
 {
     header('Access-Control-Allow-Origin: *');
     header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-    header('Access-Control-Allow-Headers: Accept, Content-Type');
+    header('Access-Control-Allow-Headers: Accept, Authorization, Content-Type, X-Vaervakt-Station-Id, X-Vaervakt-Station-Key');
     header('Access-Control-Max-Age: 86400');
 }
 

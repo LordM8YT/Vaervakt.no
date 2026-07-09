@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/api/bootstrap.php';
+require_once dirname(__DIR__) . '/api/station-lib.php';
 
 session_name('vaervakt_admin');
 session_set_cookie_params([
@@ -206,6 +207,64 @@ function admin_handle_action(PDO $pdo): ?string
         return 'Badetemperaturen ble slettet.';
     }
 
+    if ($action === 'create_station') {
+        vv_stations_tables($pdo);
+        $apiKey = vv_station_api_key();
+        $station = vv_station_create($pdo, $_POST, vv_station_status((string) ($_POST['status'] ?? 'approved')), $apiKey);
+        return 'Værstasjonen ble opprettet. Station ID: ' . $station['publicId'] . ' API-nøkkel: ' . $apiKey . ' Kopier nøkkelen nå, den vises ikke igjen.';
+    }
+
+    if ($action === 'approve_station' && $id > 0 && admin_table_exists($pdo, 'weather_stations')) {
+        $stmt = $pdo->prepare('SELECT public_id, api_key_hash FROM weather_stations WHERE id = ? LIMIT 1');
+        $stmt->execute([$id]);
+        $station = $stmt->fetch();
+        if (!$station) {
+            return 'Fant ikke værstasjonen.';
+        }
+
+        if (($station['api_key_hash'] ?? '') === '') {
+            $apiKey = vv_station_api_key();
+            $hash = vv_station_hash_key((string) $station['public_id'], $apiKey);
+            $update = $pdo->prepare("UPDATE weather_stations SET status = 'approved', api_key_hash = ? WHERE id = ? LIMIT 1");
+            $update->execute([$hash, $id]);
+            return 'Værstasjonen ble godkjent. Station ID: ' . (string) $station['public_id'] . ' API-nøkkel: ' . $apiKey . ' Kopier nøkkelen nå, den vises ikke igjen.';
+        }
+
+        $pdo->prepare("UPDATE weather_stations SET status = 'approved' WHERE id = ? LIMIT 1")->execute([$id]);
+        return 'Værstasjonen ble godkjent.';
+    }
+
+    if ($action === 'disable_station' && $id > 0 && admin_table_exists($pdo, 'weather_stations')) {
+        $pdo->prepare("UPDATE weather_stations SET status = 'disabled' WHERE id = ? LIMIT 1")->execute([$id]);
+        return 'Værstasjonen ble deaktivert.';
+    }
+
+    if ($action === 'regenerate_station_key' && $id > 0 && admin_table_exists($pdo, 'weather_stations')) {
+        $stmt = $pdo->prepare('SELECT public_id FROM weather_stations WHERE id = ? LIMIT 1');
+        $stmt->execute([$id]);
+        $publicId = (string) ($stmt->fetchColumn() ?: '');
+        if ($publicId === '') {
+            return 'Fant ikke værstasjonen.';
+        }
+
+        $apiKey = vv_station_api_key();
+        $hash = vv_station_hash_key($publicId, $apiKey);
+        $pdo->prepare('UPDATE weather_stations SET api_key_hash = ? WHERE id = ? LIMIT 1')->execute([$hash, $id]);
+        return 'Ny API-nøkkel for ' . $publicId . ': ' . $apiKey . ' Kopier nøkkelen nå, den vises ikke igjen.';
+    }
+
+    if ($action === 'delete_station' && $id > 0 && admin_table_exists($pdo, 'weather_stations')) {
+        $stmt = $pdo->prepare('DELETE FROM weather_stations WHERE id = ? LIMIT 1');
+        $stmt->execute([$id]);
+        return 'Værstasjonen og målingene ble slettet.';
+    }
+
+    if ($action === 'delete_station_reading' && $id > 0 && admin_table_exists($pdo, 'station_readings')) {
+        $stmt = $pdo->prepare('DELETE FROM station_readings WHERE id = ? LIMIT 1');
+        $stmt->execute([$id]);
+        return 'Stasjonsmålingen ble slettet.';
+    }
+
     return 'Ingen endring ble utført.';
 }
 
@@ -265,6 +324,8 @@ $weatherTypes = [];
 $visitsByPath = [];
 $glimpses = [];
 $bathReports = [];
+$stations = [];
+$stationReadings = [];
 $reportScope = admin_report_scope();
 $reportWhere = admin_report_scope_where($reportScope);
 $reportCount = 0;
@@ -273,6 +334,7 @@ if ($isLoggedIn) {
     try {
         $pdo = vv_db();
         admin_track_table($pdo);
+        vv_stations_tables($pdo);
 
         if (($_GET['export'] ?? '') === 'reports') {
             admin_csv_reports($pdo);
@@ -293,6 +355,9 @@ if ($isLoggedIn) {
             'bathTotal' => admin_count($pdo, 'bath_temperature_reports'),
             'bathSent' => admin_count($pdo, 'bath_temperature_reports', "yr_status = 'sent'"),
             'bathFailed' => admin_count($pdo, 'bath_temperature_reports', "yr_status = 'failed'"),
+            'stationsTotal' => admin_count($pdo, 'weather_stations'),
+            'stationsApproved' => admin_count($pdo, 'weather_stations', "status = 'approved'"),
+            'stationReadings24' => admin_count($pdo, 'station_readings', 'received_at >= (NOW() - INTERVAL 24 HOUR)'),
         ];
 
         $reportCount = admin_count($pdo, 'weather_reports', $reportWhere);
@@ -302,6 +367,25 @@ if ($isLoggedIn) {
         $visitsByPath = admin_fetch_all($pdo, 'site_visits', "SELECT path, COUNT(DISTINCT visitor_hash) AS unique_visitors, COUNT(*) AS views FROM site_visits WHERE created_at >= (NOW() - INTERVAL 24 HOUR) GROUP BY path ORDER BY views DESC LIMIT 12");
         $glimpses = admin_fetch_all($pdo, 'weather_glimpse_photos', 'SELECT * FROM weather_glimpse_photos ORDER BY created_at DESC LIMIT 80');
         $bathReports = admin_fetch_all($pdo, 'bath_temperature_reports', 'SELECT * FROM bath_temperature_reports ORDER BY created_at DESC LIMIT 120');
+        $stations = admin_fetch_all($pdo, 'weather_stations', "
+            SELECT
+                s.*,
+                (SELECT COUNT(*) FROM station_readings sr WHERE sr.station_id = s.id) AS readings_total,
+                (SELECT sr.temperature FROM station_readings sr WHERE sr.station_id = s.id ORDER BY sr.observed_at DESC, sr.id DESC LIMIT 1) AS latest_temperature,
+                (SELECT sr.humidity FROM station_readings sr WHERE sr.station_id = s.id ORDER BY sr.observed_at DESC, sr.id DESC LIMIT 1) AS latest_humidity,
+                (SELECT sr.pressure FROM station_readings sr WHERE sr.station_id = s.id ORDER BY sr.observed_at DESC, sr.id DESC LIMIT 1) AS latest_pressure,
+                (SELECT sr.observed_at FROM station_readings sr WHERE sr.station_id = s.id ORDER BY sr.observed_at DESC, sr.id DESC LIMIT 1) AS latest_observed_at
+            FROM weather_stations s
+            ORDER BY FIELD(s.status, 'pending', 'approved', 'disabled'), s.updated_at DESC
+            LIMIT 200
+        ");
+        $stationReadings = admin_fetch_all($pdo, 'station_readings', "
+            SELECT r.*, s.public_name, s.public_id, s.location_name
+            FROM station_readings r
+            JOIN weather_stations s ON s.id = r.station_id
+            ORDER BY r.observed_at DESC, r.id DESC
+            LIMIT 120
+        ");
     } catch (Throwable $error) {
         $dbError = $error->getMessage();
     }
@@ -464,7 +548,7 @@ if ($isLoggedIn) {
       padding: 28px;
     }
     .field { display: grid; gap: 8px; margin-top: 16px; }
-    input {
+    input, select, textarea {
       width: 100%;
       min-height: 46px;
       border: 1px solid rgba(148, 163, 184, .24);
@@ -474,6 +558,17 @@ if ($isLoggedIn) {
       padding: 0 14px;
       font-size: 16px;
     }
+    textarea { min-height: 92px; padding-top: 12px; resize: vertical; }
+    select { appearance: none; }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .form-grid .wide { grid-column: 1 / -1; }
+    .status-approved { border-color: rgba(52, 211, 153, .34); color: #bbf7d0; background: rgba(52, 211, 153, .12); }
+    .status-pending { border-color: rgba(251, 191, 36, .34); color: #fde68a; background: rgba(251, 191, 36, .12); }
+    .status-disabled { border-color: rgba(148, 163, 184, .28); color: #cbd5e1; background: rgba(148, 163, 184, .08); }
     .tabs { display: flex; gap: 8px; margin: 10px 0 16px; flex-wrap: wrap; }
     .tabs a { text-decoration: none; }
     .tab-active { background: var(--blue); color: #04111f; }
@@ -549,17 +644,19 @@ if ($isLoggedIn) {
         <div class="stat"><span class="eyebrow">Kartpunkter</span><strong><?= h((string) $stats['mapPoints']) ?></strong><p class="muted">Rapporter med koordinater</p></div>
         <div class="stat"><span class="eyebrow">Bildeglimt</span><strong><?= h((string) $stats['activeGlimpses']) ?></strong><p class="muted">Aktive nå</p></div>
         <div class="stat"><span class="eyebrow">Badetemp</span><strong><?= h((string) $stats['bathTotal']) ?></strong><p class="muted"><?= h((string) $stats['bathSent']) ?> sendt, <?= h((string) $stats['bathFailed']) ?> feilet</p></div>
+        <div class="stat"><span class="eyebrow">Værstasjoner</span><strong><?= h((string) $stats['stationsApproved']) ?></strong><p class="muted"><?= h((string) $stats['stationsTotal']) ?> totalt · <?= h((string) $stats['stationReadings24']) ?> målinger 24t</p></div>
       </section>
 
       <div class="tabs">
         <a class="button <?= ($_GET['view'] ?? 'reports') === 'reports' ? 'tab-active' : '' ?>" href="/admin/?view=reports">Rapporter</a>
         <a class="button <?= ($_GET['view'] ?? '') === 'bath' ? 'tab-active' : '' ?>" href="/admin/?view=bath">Badetemp</a>
         <a class="button <?= ($_GET['view'] ?? '') === 'glimpses' ? 'tab-active' : '' ?>" href="/admin/?view=glimpses">Bildeglimt</a>
+        <a class="button <?= ($_GET['view'] ?? '') === 'stations' ? 'tab-active' : '' ?>" href="/admin/?view=stations">Værstasjoner</a>
         <a class="button <?= ($_GET['view'] ?? '') === 'traffic' ? 'tab-active' : '' ?>" href="/admin/?view=traffic">Trafikk</a>
       </div>
 
       <?php $view = (string) ($_GET['view'] ?? 'reports'); ?>
-      <?php if (!in_array($view, ['reports', 'bath', 'glimpses', 'traffic'], true)) $view = 'reports'; ?>
+      <?php if (!in_array($view, ['reports', 'bath', 'glimpses', 'stations', 'traffic'], true)) $view = 'reports'; ?>
       <section class="grid main">
         <div class="card">
           <?php if ($view === 'glimpses'): ?>
@@ -614,6 +711,171 @@ if ($isLoggedIn) {
                 <?php endforeach; ?>
                 <?php if (!$bathReports): ?>
                   <tr><td colspan="8" class="muted">Ingen badetemperaturer sendt inn ennå.</td></tr>
+                <?php endif; ?>
+                </tbody>
+              </table>
+            </div>
+          <?php elseif ($view === 'stations'): ?>
+            <div class="card-head">
+              <div>
+                <h2>Værstasjoner</h2>
+                <p class="muted" style="margin-top:6px">Godkjenn eksterne stasjoner og hent inn automatiske lokale målinger.</p>
+              </div>
+              <span class="pill"><?= h((string) $stats['stationsApproved']) ?> aktive</span>
+            </div>
+            <div class="card-body">
+              <form method="post" class="form-grid">
+                <input type="hidden" name="csrf" value="<?= h(admin_csrf()) ?>">
+                <input type="hidden" name="action" value="create_station">
+                <label class="field">
+                  <span>Internt navn</span>
+                  <input name="name" placeholder="Patrick Netatmo">
+                </label>
+                <label class="field">
+                  <span>Offentlig navn</span>
+                  <input name="publicName" placeholder="Tinnheia værstasjon">
+                </label>
+                <label class="field">
+                  <span>Sted</span>
+                  <input name="locationName" placeholder="Tinnheia, Kristiansand">
+                </label>
+                <label class="field">
+                  <span>Leverandør</span>
+                  <input name="provider" placeholder="Netatmo, Home Assistant, Ecowitt">
+                </label>
+                <label class="field">
+                  <span>Eier/navn</span>
+                  <input name="ownerName" placeholder="Valgfritt">
+                </label>
+                <label class="field">
+                  <span>Kontakt</span>
+                  <input name="ownerContact" placeholder="Valgfritt">
+                </label>
+                <label class="field">
+                  <span>Breddegrad</span>
+                  <input name="lat" inputmode="decimal" placeholder="58.1502">
+                </label>
+                <label class="field">
+                  <span>Lengdegrad</span>
+                  <input name="lon" inputmode="decimal" placeholder="7.9527">
+                </label>
+                <label class="field">
+                  <span>Koordinatvisning</span>
+                  <select name="coordinatePrecision">
+                    <option value="area">Vis område cirka</option>
+                    <option value="exact">Vis eksakt</option>
+                    <option value="hidden">Skjul koordinater</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Status</span>
+                  <select name="status">
+                    <option value="approved">Godkjent med en gang</option>
+                    <option value="pending">Venter</option>
+                  </select>
+                </label>
+                <div class="field wide">
+                  <span>Måletyper</span>
+                  <div class="actions" style="justify-content:flex-start">
+                    <label class="pill"><input type="checkbox" name="capabilities[]" value="temperature" checked style="width:auto; min-height:0"> Temperatur</label>
+                    <label class="pill"><input type="checkbox" name="capabilities[]" value="humidity" style="width:auto; min-height:0"> Fuktighet</label>
+                    <label class="pill"><input type="checkbox" name="capabilities[]" value="pressure" style="width:auto; min-height:0"> Trykk</label>
+                    <label class="pill"><input type="checkbox" name="capabilities[]" value="rain" style="width:auto; min-height:0"> Regn</label>
+                    <label class="pill"><input type="checkbox" name="capabilities[]" value="wind" style="width:auto; min-height:0"> Vind</label>
+                  </div>
+                </div>
+                <div class="wide actions" style="justify-content:flex-start">
+                  <button class="primary" type="submit">Opprett stasjon og nøkkel</button>
+                  <a class="button" href="/docs/weather-stations.md">Åpne API-guide</a>
+                </div>
+              </form>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Status</th><th>Stasjon</th><th>Station ID</th><th>Siste måling</th><th>Koordinater</th><th>Målinger</th><th>Handling</th></tr></thead>
+                <tbody>
+                <?php foreach ($stations as $station): ?>
+                  <?php
+                    $status = vv_station_status((string) $station['status']);
+                    $latest = $station['latest_temperature'] !== null ? number_format((float) $station['latest_temperature'], 1, ',', '') . '°' : 'Ingen';
+                    if ($station['latest_humidity'] !== null) {
+                        $latest .= ' · ' . number_format((float) $station['latest_humidity'], 0, ',', '') . '%';
+                    }
+                    if ($station['latest_pressure'] !== null) {
+                        $latest .= ' · ' . number_format((float) $station['latest_pressure'], 0, ',', '') . ' hPa';
+                    }
+                  ?>
+                  <tr>
+                    <td><span class="pill status-<?= h($status) ?>"><?= h($status) ?></span></td>
+                    <td><strong><?= h((string) $station['public_name']) ?></strong><br><span class="muted"><?= h((string) $station['location_name']) ?> · <?= h((string) ($station['provider'] ?? '')) ?></span></td>
+                    <td><code><?= h((string) $station['public_id']) ?></code></td>
+                    <td><strong><?= h($latest) ?></strong><br><span class="muted"><?= h((string) ($station['latest_observed_at'] ?? '')) ?></span></td>
+                    <td class="muted"><?= $station['latitude'] !== null ? h((string) $station['latitude'] . ', ' . (string) $station['longitude']) : 'Mangler' ?><br><?= h((string) $station['coordinate_precision']) ?></td>
+                    <td><?= h((string) $station['readings_total']) ?></td>
+                    <td>
+                      <div class="actions" style="justify-content:flex-start">
+                        <?php if ($status !== 'approved'): ?>
+                          <form method="post" class="inline-form">
+                            <input type="hidden" name="csrf" value="<?= h(admin_csrf()) ?>">
+                            <input type="hidden" name="id" value="<?= h((string) $station['id']) ?>">
+                            <button class="primary" name="action" value="approve_station">Godkjenn</button>
+                          </form>
+                        <?php endif; ?>
+                        <?php if ($status !== 'disabled'): ?>
+                          <form method="post" class="inline-form">
+                            <input type="hidden" name="csrf" value="<?= h(admin_csrf()) ?>">
+                            <input type="hidden" name="id" value="<?= h((string) $station['id']) ?>">
+                            <button name="action" value="disable_station">Deaktiver</button>
+                          </form>
+                        <?php endif; ?>
+                        <form method="post" class="inline-form">
+                          <input type="hidden" name="csrf" value="<?= h(admin_csrf()) ?>">
+                          <input type="hidden" name="id" value="<?= h((string) $station['id']) ?>">
+                          <button name="action" value="regenerate_station_key">Ny nøkkel</button>
+                        </form>
+                        <form method="post" class="inline-form">
+                          <input type="hidden" name="csrf" value="<?= h(admin_csrf()) ?>">
+                          <input type="hidden" name="id" value="<?= h((string) $station['id']) ?>">
+                          <button class="danger" name="action" value="delete_station">Slett</button>
+                        </form>
+                      </div>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+                <?php if (!$stations): ?>
+                  <tr><td colspan="7" class="muted">Ingen værstasjoner lagt til enda.</td></tr>
+                <?php endif; ?>
+                </tbody>
+              </table>
+            </div>
+            <div class="card-head" style="border-top:1px solid rgba(148, 163, 184, .16)">
+              <h2>Siste stasjonsmålinger</h2>
+              <span class="pill"><?= count($stationReadings) ?> vist</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Tid</th><th>Stasjon</th><th>Temp</th><th>Fukt</th><th>Trykk</th><th>Regn</th><th>Vind</th><th>Handling</th></tr></thead>
+                <tbody>
+                <?php foreach ($stationReadings as $reading): ?>
+                  <tr>
+                    <td><?= h((string) $reading['observed_at']) ?><br><span class="muted">Mottatt <?= h((string) $reading['received_at']) ?></span></td>
+                    <td><strong><?= h((string) $reading['public_name']) ?></strong><br><span class="muted"><?= h((string) $reading['location_name']) ?></span></td>
+                    <td><?= $reading['temperature'] !== null ? h(number_format((float) $reading['temperature'], 1, ',', '') . '°') : '—' ?></td>
+                    <td><?= $reading['humidity'] !== null ? h(number_format((float) $reading['humidity'], 0, ',', '') . '%') : '—' ?></td>
+                    <td><?= $reading['pressure'] !== null ? h(number_format((float) $reading['pressure'], 0, ',', '') . ' hPa') : '—' ?></td>
+                    <td><?= $reading['rain_rate'] !== null ? h(number_format((float) $reading['rain_rate'], 1, ',', '') . ' mm/t') : '—' ?></td>
+                    <td><?= $reading['wind_speed'] !== null ? h(number_format((float) $reading['wind_speed'], 1, ',', '') . ' m/s') : '—' ?></td>
+                    <td>
+                      <form method="post" class="inline-form">
+                        <input type="hidden" name="csrf" value="<?= h(admin_csrf()) ?>">
+                        <input type="hidden" name="id" value="<?= h((string) $reading['id']) ?>">
+                        <button class="danger" name="action" value="delete_station_reading">Slett</button>
+                      </form>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+                <?php if (!$stationReadings): ?>
+                  <tr><td colspan="8" class="muted">Ingen stasjonsmålinger enda.</td></tr>
                 <?php endif; ?>
                 </tbody>
               </table>

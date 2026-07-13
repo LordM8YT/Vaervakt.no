@@ -4,64 +4,94 @@ Denne filen er den samlede todo-listen for Værvakt.no.
 
 Større oppgaver kan også opprettes som egne GitHub Issues. Når en oppgave er fullført, endres `[ ]` til `[x]`.
 
+Sist oppdatert: 13. juli 2026. Oppgavene under **Nå – prioritert rekkefølge** gjennomføres ovenfra og ned. Resten av dokumentet er gruppert etter fagområde.
+
 ---
 
-## Høy prioritet
+## Nå – prioritert rekkefølge
 
-- [ ] Banner mode for hendelser og kunngjøringer
-  - Aktiv/av-bryter
-  - Tittel og melding
-  - Valgfri lenke
-  - Start- og utløpstid
-  - Typer: info, feiring, advarsel og drift
-  - Lukkeknapp
-  - Husk lukking med localStorage
-  - Mobilvennlig visning
-  - Støtte i OBS-overlay og ticker
-  - Kan brukes ved ekstremvær, driftsmeldinger, store sportsøyeblikk og lanseringer
-  - Se GitHub Issue #19
+1. [ ] Moderering og misbruksvern for værrapporter
+   - [ ] La brukere rapportere feil eller misbruk
+   - [ ] Legg til modereringsstatus og handlinger i admin
+   - [ ] Skjul eller slett rapporter som er moderert
+   - [ ] Lag automatisk utløp/opprydding for gamle rapporter
 
-- [ ] Automatisk tilkobling av værstasjoner
-  - Lag en enkel veiviser
-  - Brukeren velger leverandør
-  - Logg inn eller koble til
-  - Finn stasjonsnavn, sted, koordinater og sensorer automatisk
-  - Vis testmåling før aktivering
-  - Se GitHub Issue #21
-  - Se også `README_STATION_INTEGRATION.md`
+2. [ ] Vis eksisterende værstasjoner i appen
+   - [x] API for godkjente stasjoner og siste måling finnes
+   - [ ] Hent nærmeste godkjente stasjoner for valgt sted eller GPS-posisjon
+   - [ ] Vis online/offline og tidspunkt for siste oppdatering
+   - [ ] Skill stasjonsmålinger tydelig fra brukerrapporter
 
-- [ ] Søk etter sted
-  - Brukere skal kunne søke etter et sted
-  - Vis rapporter fra valgt sted
-  - Vis antall rapporter
-  - Vis siste aktivitet
-  - Vis tilgjengelige værstasjoner i området
-  - Vis en samlet status for området
+3. [ ] Fullfør stedssøk og samlet områdestatus
+   - [x] Brukere kan søke etter et sted
+   - [x] Valgt sted huskes lokalt
+   - [x] Vis rapporter, antall og siste aktivitet for valgt sted
+   - [ ] Vis tilgjengelige værstasjoner i området
+   - [ ] Oppsummer rapporter, stasjoner og siste aktivitet i én områdestatus
 
-- [ ] Rapporter nær deg
-  - Bruk GPS-posisjon
-  - Finn rapporter i nærheten
-  - Vis avstand til rapporten
-  - Filtrer på tidsrom
-  - Vis antall rapporter nær brukerens sted
+4. [ ] Badeplassforslag fra Yr
+   - [ ] Legg til autocomplete for badeplassnavn
+   - [ ] Bruk valgt Yr-badeplass og koordinater ved innsending
+   - [ ] Vis en tydelig melding hvis Yr ikke kan matche badeplassen
 
-- [ ] Forbedre rapportskjema
-  - Alle felt skal være tomme første gang
-  - Husk navn og sist brukte sted med localStorage
-  - Ikke husk temperatur, værtype eller rapporttekst
-  - Tøm rapportteksten etter vellykket innsending
-  - Autofyll temperatur, værtype og sted ved bruk av GPS
+5. [ ] Utvid misbruksvernet til øvrige offentlige skriveendepunkter
+   - [x] Rate limiting og feltvalidering for værrapporter
+   - [ ] Rate limiting for Værglimt
+   - [ ] Rate limiting for badetemperaturer
+   - [ ] Rate limiting for hub-innlegg, stemmer og besøkslogging
+
+6. [ ] Avklar første versjon av push-varsler
+   - [ ] Velg hvilke varsler som skal lanseres først
+   - [ ] Definer samtykke, geografisk område og varslingsgrenser
+   - [ ] Test VAPID-oppsett og levering før varsler aktiveres
 
 ---
 
 ## Værstasjoner
 
+- [ ] Universelt værstasjons-API
+  - [x] JSON-endepunkt for innsending og lesing
+  - [x] Unik, hashet API-nøkkel per stasjon
+  - [x] Temperatur
+  - [x] Luftfuktighet
+  - [x] Lufttrykk
+  - [x] Vindstyrke
+  - [ ] Vindkast
+  - [x] Vindretning
+  - [x] Nedbør
+  - [x] Måletidspunkt
+  - [x] Dokumentert Home Assistant-eksempel
+
 - [ ] Verifiserte værstasjoner
-  - Vis merke for verifisert stasjon
-  - Vis om stasjonen er online
-  - Vis siste oppdatering
-  - Vis datakvalitet
-  - Skill mellom automatisk måling og brukerrapport
+  - [x] Godkjenning og deaktivering i admin
+  - [x] Kun godkjente stasjoner vises i offentlig API
+  - [ ] Vis merke for verifisert stasjon i appen
+  - [ ] Vis om stasjonen er online
+  - [ ] Vis siste oppdatering
+  - [ ] Vis datakvalitet
+  - [ ] Skill mellom automatisk måling og brukerrapport
+
+- [ ] Home Assistant-integrasjon
+  - [x] REST-endepunkt
+  - [x] Ferdig oppsettseksempel
+  - [ ] Automatisk identifisering av sensorer der det er mulig
+
+- [ ] CumulusMX- og WeeWX-integrasjon
+  - Ferdig opplastingsadresse
+  - Dokumenter støttede felter
+  - Eksempelkonfigurasjoner
+
+- [ ] Ecowitt-integrasjon
+  - Custom Weather Server
+  - Generer ferdig serveradresse
+  - Bruk eksisterende stasjons-ID og nøkkel
+  - QR-kode eller enkel oppsettsveiviser
+  - Test tilkoblingen før aktivering
+
+- [ ] WeatherLink-integrasjon
+  - Koble til via WeatherLink API
+  - Automatisk hente stasjonsinformasjon
+  - Automatisk hente målinger
 
 - [ ] Netatmo-integrasjon
   - OAuth-innlogging
@@ -69,39 +99,12 @@ Større oppgaver kan også opprettes som egne GitHub Issues. Når en oppgave er 
   - Automatisk synkronisering av målinger
   - Sikker lagring av tokens
 
-- [ ] WeatherLink-integrasjon
-  - Koble til via WeatherLink API
-  - Automatisk hente stasjonsinformasjon
-  - Automatisk hente målinger
-
-- [ ] Ecowitt-integrasjon
-  - Custom Weather Server
-  - Generer ferdig serveradresse
-  - Generer unik stasjons-ID og nøkkel
-  - QR-kode eller enkel oppsettsveiviser
-  - Test tilkoblingen før aktivering
-
-- [ ] Home Assistant-integrasjon
-  - Webhook eller REST API
-  - Ferdig oppsettseksempel
-  - Automatisk identifisering av sensorer der det er mulig
-
-- [ ] CumulusMX- og WeeWX-integrasjon
-  - Ferdig opplastingsadresse
-  - Dokumenter støttede felter
-  - Eksempelkonfigurasjoner
-
-- [ ] Universelt værstasjons-API
-  - JSON-endepunkt
-  - Unik API-nøkkel per stasjon
-  - Temperatur
-  - Luftfuktighet
-  - Lufttrykk
-  - Vindstyrke
-  - Vindkast
-  - Vindretning
-  - Nedbør
-  - Måletidspunkt
+- [ ] Datakvalitet for værstasjoner
+  - Avvis åpenbart urealistiske målinger
+  - Oppdag sensorer som sitter fast
+  - Sammenlign med nærliggende stasjoner
+  - Merk gamle målinger
+  - Sett stasjonen som offline etter manglende data
 
 - [ ] Stasjonssider
   - Offentlig side for hver stasjon
@@ -112,13 +115,6 @@ Større oppgaver kan også opprettes som egne GitHub Issues. Når en oppgave er 
   - Siste målinger
   - Sensoroversikt
   - Historikk og grafer
-
-- [ ] Datakvalitet for værstasjoner
-  - Avvis åpenbart urealistiske målinger
-  - Oppdag sensorer som sitter fast
-  - Sammenlign med nærliggende stasjoner
-  - Merk gamle målinger
-  - Sett stasjonen som offline etter manglende data
 
 ---
 
@@ -177,56 +173,64 @@ Større oppgaver kan også opprettes som egne GitHub Issues. Når en oppgave er 
 
 ## Badetemperaturer og Yr
 
-- [ ] Hente badetemperaturer fra Yr
+- [x] Hente ferske badetemperaturer fra Yr for valgt område
 
-- [ ] Sende badetemperaturer til Yr
+- [x] Sende badetemperaturer til Yr via serveren
+
+- [ ] Badeplassforslag/autocomplete mot Yr
+  - Søk etter godkjente badeplassnavn
+  - Bruk ID og koordinater fra valgt treff
+  - Reduser avviste innsendinger til Yr
 
 - [ ] Egen søkeside for badeplasser
 
 - [ ] Historikk for badetemperaturer
 
 - [ ] Innsendingsskjema for badetemperatur
-  - Badeplass
-  - Temperatur
-  - Måletidspunkt
-  - Målemetode
-  - Navn på innsender
+  - [x] Badeplass
+  - [x] Temperatur
+  - [x] Oppvarmet vann
+  - [x] Koordinater fra valgt sted/GPS
+  - [ ] Måletidspunkt
+  - [ ] Målemetode
+  - [ ] Navn på innsender
 
-- [ ] Tydelig kreditering
-  - Vis teksten `Badetemperaturer levert av Yr` direkte ved dataene
+- [x] Tydelig kreditering
+  - [x] Vis teksten `Badetemperaturer levert av Yr` direkte ved dataene
 
-- [ ] Sikker håndtering av Yr API-nøkkel
-  - Nøkkelen skal kun brukes server-side
-  - Ikke legg nøkkelen i JavaScript
-  - Ikke legg nøkkelen i offentlig GitHub-repository
-  - Bruk miljøvariabel eller privat konfigurasjonsfil
+- [x] Sikker håndtering av Yr API-nøkkel
+  - [x] Nøkkelen brukes kun server-side
+  - [x] Nøkkelen ligger ikke i JavaScript eller offentlig repository
+  - [x] Nøkkelen leses fra miljøvariabel eller privat konfigurasjonsfil
 
 ---
 
 ## Rapporter fra brukere
 
-- [ ] Bilder på rapporter
-
-- [ ] Reaksjoner på rapporter
-
 - [ ] Rapporter feil eller misbruk
 
 - [ ] Moderering av rapporter
+  - Modereringsstatus i databasen
+  - Handlinger og oversikt i admin
+  - Skjul modererte rapporter fra offentlig API
 
-- [ ] Filtrering etter:
-  - Sted
-  - Værtype
-  - Tidspunkt
-  - Avstand
-  - Temperatur
+- [ ] Automatisk utløp og opprydding for gamle rapporter
 
-- [ ] Automatisk utløp for gamle rapporter
+- [ ] Filtrering av rapporter
+  - [x] Sted
+  - [ ] Værtype
+  - [x] Tidsrom
+  - [x] Avstand
+  - [ ] Temperaturområde
 
-- [ ] Skill tydelig mellom:
-  - Brukerrapport
-  - Værstasjonsmåling
-  - Offisielt farevarsel
-  - Badetemperatur
+- [ ] Skill tydelig mellom datakilder
+  - [x] Brukerrapport og badetemperatur
+  - [ ] Værstasjonsmåling
+  - [ ] Offisielt farevarsel
+
+- [ ] Bilder på rapporter
+
+- [ ] Reaksjoner på rapporter
 
 ---
 
@@ -336,72 +340,105 @@ Siste måling: 2 minutter siden
 
 ## Adminpanel
 
-- [ ] Innlogging for administratorer
+- [x] Innlogging for administratorer med sesjon og CSRF-beskyttelse
 
 - [ ] Opprett og administrer bannere
 
-- [ ] Godkjenn og administrer værstasjoner
+- [x] Opprett, godkjenn, deaktiver og slett værstasjoner
 
-- [ ] Regenerer stasjonsnøkler
+- [x] Regenerer stasjonsnøkler
 
-- [ ] Se sist mottatte data
+- [x] Se siste stasjonsmålinger og mottatte data
 
 - [ ] Se API-feil og tilkoblingsfeil
 
 - [ ] Moderer brukerrapporter
+  - [x] Se og slette rapporter manuelt
+  - [ ] Modereringsstatus, begrunnelse og misbruksvarsler
 
 - [ ] Blokker misbruk
 
-- [ ] Administrer badetemperaturer
+- [x] Se status for og slette innsendte badetemperaturer
 
 - [ ] Se statistikk
-  - Antall rapporter
-  - Aktive værstasjoner
-  - Aktive brukere
-  - API-trafikk
-  - Push-abonnementer
+  - [x] Antall rapporter
+  - [x] Aktive værstasjoner og stasjonsmålinger
+  - [x] Besøk og aktive brukere
+  - [ ] API-trafikk per endepunkt
+  - [ ] Push-abonnementer
 
 ---
 
 ## Sikkerhet
 
 - [ ] Rate limiting på API-endepunkter
+  - [x] Værrapporter
+  - [ ] Værglimt, badetemperatur og øvrige offentlige endepunkter
 
 - [ ] Valider alle innsendte målinger
+  - [x] Temperatur, værtype, koordinater og feltlengder for værrapporter
+  - [x] Gyldige måleområder for værstasjoner
+  - [ ] Gjennomgå Værglimt, badetemperatur og hub
 
 - [ ] CSRF-beskyttelse på skjemaer
+  - [x] Adminhandlinger
+  - [ ] Vurder og dokumenter beskyttelsen for offentlige skriveendepunkter
 
 - [ ] Begrens lengde på tekstfelt
+  - [x] Værrapporter
+  - [ ] Gjennomgå øvrige skjemaer og API-endepunkter
 
 - [ ] Bruk prepared statements overalt
 
-- [ ] Ikke vis hemmelige nøkler i frontend
+- [x] Ikke vis Yr-, database- eller stasjonsnøkler i frontend
 
-- [ ] Mulighet for å regenerere nøkler
+- [x] Mulighet for å regenerere stasjonsnøkler
 
 - [ ] Loggfør mistenkelig trafikk
 
-- [ ] Beskytt adminpanelet
+- [x] Beskytt adminpanelet med innlogging, sikre sesjonscookies og CSRF-token
 
 ---
 
 ## API for tredjepartsutviklere
 
 - [ ] Offentlig dokumentasjon
+  - [x] Værstasjons-API
+  - [ ] Samlet og publiserbar API-dokumentasjon
 
 - [ ] API-nøkler
+  - [x] Unike nøkler for værstasjoner
+  - [ ] Nøkler og tilgangsnivåer for andre tredjepartsbrukere
 
-- [ ] Lesetilgang til offentlige data
+- [x] Lesetilgang til offentlige værrapporter og godkjente værstasjoner
 
-- [ ] Innsending av værstasjonsdata
+- [x] Innsending av værstasjonsdata
 
-- [ ] Innsending av brukerrapporter
+- [x] Innsending av brukerrapporter
 
 - [ ] Webhooks
 
 - [ ] Trafikkgrenser
+  - [x] Innsending av værrapporter
+  - [ ] Lesekall og øvrige skriveendepunkter
 
 - [ ] Versjonert API, for eksempel `/api/v1/`
+
+---
+
+## Parkert foreløpig
+
+- [ ] Banner mode for hendelser og kunngjøringer
+  - Aktiv/av-bryter, innhold, lenke og tidsstyring
+  - Typer: info, feiring, advarsel og drift
+  - Støtte i app, OBS-overlay og ticker
+  - Se GitHub Issue #19
+
+- [ ] Automatisk tilkobling av værstasjoner
+  - Veiviser og leverandørvalg
+  - Automatisk oppdagelse av stasjon, sted og sensorer
+  - Testmåling før aktivering
+  - Se GitHub Issue #21
 
 ---
 
@@ -426,6 +463,28 @@ Siste måling: 2 minutter siden
 ## Fullført
 
 Flytt ferdige oppgaver hit eller marker dem som `[x]`.
+
+- [x] Forbedret rapportskjema
+  - Tomme observasjonsfelt ved oppstart og etter innsending
+  - Husk navn og sist valgte sted, men ikke temperatur eller værtype
+  - Autofyll temperatur, værtype og sted ved bruk av GPS
+
+- [x] Lokale rapporter nær valgt sted eller GPS-posisjon
+  - Avstand, tidsfilter, antall rapporter og siste aktivitet
+  - Temperatur med desimaler og korrekt lokalt stedsnavn
+
+- [x] Stedssøk og lagring av sist valgte sted
+
+- [x] Norsk reverse geokoding via Kartverket med Nominatim som reserve
+
+- [x] Grunnplattform for private værstasjoner
+  - Database, offentlig lese-API og autentisert innsending
+  - Oppretting, godkjenning, nøkkelregenerering og målinger i admin
+  - API-guide og Home Assistant-eksempel
+
+- [x] Grunnintegrasjon for badetemperaturer fra og til Yr
+
+- [x] Rate limiting og strengere validering av værrapporter
 
 - [x] Grunnleggende rapportsystem
 - [x] Database for rapporter

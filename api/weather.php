@@ -70,10 +70,16 @@ function vv_fetch_bath(float $lat, float $lon): ?array
     }
 
     $cache = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'vv2_bath_' . round($lat, 2) . '_' . round($lon, 2) . '.json';
-    if (is_readable($cache) && filemtime($cache) !== false && time() - (int) filemtime($cache) < 900) {
-        $cached = json_decode((string) file_get_contents($cache), true);
-        if (is_array($cached)) {
-            return $cached;
+    $cached = null;
+    $cacheAge = null;
+    if (is_readable($cache) && filemtime($cache) !== false) {
+        $cacheAge = time() - (int) filemtime($cache);
+        $cachedPayload = json_decode((string) file_get_contents($cache), true);
+        if (is_array($cachedPayload)) {
+            $cached = $cachedPayload;
+            if ($cacheAge < 900) {
+                return $cached;
+            }
         }
     }
 
@@ -81,10 +87,18 @@ function vv_fetch_bath(float $lat, float $lon): ?array
     $url = 'https://badetemperaturer.yr.no/api/locations/' . $location . '/nearestwatertemperatures';
     try {
         $data = vv_http_get_json($url, ['apikey: ' . YR_BATH_API_KEY], 8);
-        @file_put_contents($cache, json_encode($data));
+        $items = $data['data'] ?? $data['items'] ?? $data;
+        if (is_array($items) && count($items) > 0) {
+            @file_put_contents($cache, json_encode($data));
+        } elseif ($cached !== null && $cacheAge !== null && $cacheAge < 43200) {
+            return $cached;
+        }
         return $data;
     } catch (Throwable $error) {
         error_log('bath api failed: ' . $error->getMessage());
+        if ($cached !== null && $cacheAge !== null && $cacheAge < 43200) {
+            return $cached;
+        }
         return null;
     }
 }

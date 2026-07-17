@@ -3,7 +3,6 @@ const CORE_ASSETS = [
   "/",
   "/lokalt/",
   "/bad/",
-  "/glimt/",
   "/manifest.json",
   "/weather.png",
   "/weather.ico",

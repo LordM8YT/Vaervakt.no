@@ -4,8 +4,10 @@ declare(strict_types=1);
 require_once __DIR__ . '/bootstrap.php';
 
 try {
-    $lat = vv_float($_GET['lat'] ?? null);
-    $lon = vv_float($_GET['lon'] ?? null);
+    $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+    $input = $method === 'POST' ? vv_request_body() : $_GET;
+    $lat = vv_float($input['lat'] ?? null);
+    $lon = vv_float($input['lon'] ?? null);
 
     if ($lat !== null && $lon !== null) {
         if ($lat < -90 || $lat > 90 || $lon < -180 || $lon > 180) {
@@ -29,14 +31,11 @@ try {
         vv_json([
             'success' => true,
             'result' => [
-                'id' => 'pos-' . round($lat, 4) . '-' . round($lon, 4),
                 'name' => $label !== '' ? $label : 'Din posisjon',
-                'lat' => $lat,
-                'lon' => $lon,
                 'source' => 'user',
                 'provider' => 'nominatim',
             ],
-        ], 200, 'public, max-age=900');
+        ], 200, 'no-store');
     }
 
     $query = trim((string) ($_GET['q'] ?? ''));

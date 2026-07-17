@@ -29,6 +29,13 @@ function vv_bath_reports_table(PDO $pdo): void
     );
 }
 
+function vv_bath_reports_cleanup(PDO $pdo): void
+{
+    $retentionDays = max(1, min(90, (int) vv_env('BATH_REPORT_RETENTION_DAYS', '30')));
+    $pdo->exec("DELETE FROM bath_temperature_reports WHERE created_at < (NOW() - INTERVAL {$retentionDays} DAY)");
+    $pdo->exec('UPDATE bath_temperature_reports SET reporter = NULL WHERE reporter IS NOT NULL');
+}
+
 function vv_bath_bool(mixed $value): bool
 {
     if (is_bool($value)) {
@@ -130,13 +137,24 @@ function vv_bath_post_to_yr(array $entry): array
     ];
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['cleanup'])) {
+    try {
+        $pdo = vv_db();
+        vv_bath_reports_table($pdo);
+        vv_bath_reports_cleanup($pdo);
+        vv_json(['success' => true, 'cleaned' => true]);
+    } catch (Throwable $error) {
+        error_log('bath privacy cleanup failed: ' . $error->getMessage());
+        vv_error('Kunne ikke rydde badetemperaturdata akkurat nå.', 500);
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     vv_error('Metoden støttes ikke.', 405);
 }
 
 $body = vv_request_body();
 $name = vv_limit(trim((string) ($body['name'] ?? $body['locationName'] ?? '')), 140);
-$reporter = vv_limit(trim((string) ($body['reporter'] ?? $body['username'] ?? '')), 80);
 $temperature = vv_float($body['temperature'] ?? null);
 $lat = vv_float($body['lat'] ?? $body['latitude'] ?? null);
 $lon = vv_float($body['lon'] ?? $body['longitude'] ?? null);
@@ -172,6 +190,7 @@ if ($requestJson === false) {
 try {
     $pdo = vv_db();
     vv_bath_reports_table($pdo);
+    vv_bath_reports_cleanup($pdo);
 
     $insert = $pdo->prepare(
         'INSERT INTO bath_temperature_reports
@@ -180,7 +199,7 @@ try {
     );
     $insert->execute([
         $name,
-        $reporter !== '' ? $reporter : null,
+        null,
         round($temperature, 1),
         round($lat, 6),
         round($lon, 6),

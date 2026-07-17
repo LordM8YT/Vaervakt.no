@@ -1,5 +1,5 @@
-const CACHE_NAME = "vaervakt-shell-v22";
-const SHELL_ASSETS = [
+const CACHE_NAME = "vaervakt-svelte-shell-v1";
+const CORE_ASSETS = [
   "/",
   "/lokalt/",
   "/bad/",
@@ -7,33 +7,43 @@ const SHELL_ASSETS = [
   "/manifest.json",
   "/weather.png",
   "/weather.ico",
-  "/assets/js/live-enhancements.js?v=11",
-  "/assets/js/app.js",
-  "/assets/js/app-tabs.js",
-  "/static/css/main.b781c170.css",
-  "/static/js/main.4dc4ecc4.js",
 ];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(SHELL_ASSETS))
-      .catch(() => undefined)
-      .then(() => self.skipWaiting()),
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+      const assets = [...CORE_ASSETS];
+
+      try {
+        const response = await fetch("/asset-manifest.json", { cache: "no-store" });
+        const manifest = await response.json();
+        assets.push(...Object.values(manifest.files || {}));
+      } catch {
+        // Kjernen er fortsatt nok til å starte appen på nett.
+      }
+
+      await Promise.allSettled([...new Set(assets)].map((asset) => cache.add(asset)));
+      await self.skipWaiting();
+    })()
   );
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
-      .then(() => self.clients.claim()),
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
+      )
+      .then(() => self.clients.claim())
   );
 });
 
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;
+
   const url = new URL(request.url);
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/admin/")) return;
 
@@ -42,27 +52,26 @@ self.addEventListener("fetch", (event) => {
       fetch(request)
         .then((response) => {
           if (response.ok && url.origin === self.location.origin) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone)).catch(() => {});
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, response.clone()));
           }
           return response;
         })
-        .catch(() => caches.match(request).then((cached) => cached || caches.match("/"))),
+        .catch(() => caches.match(request).then((cached) => cached || caches.match("/")))
     );
     return;
   }
 
   event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached;
-      return fetch(request).then((response) => {
-        if (response.ok && url.origin === self.location.origin) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone)).catch(() => {});
-        }
-        return response;
-      });
-    }),
+    caches.match(request).then(
+      (cached) =>
+        cached ||
+        fetch(request).then((response) => {
+          if (response.ok && url.origin === self.location.origin) {
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, response.clone()));
+          }
+          return response;
+        })
+    )
   );
 });
 
@@ -86,7 +95,7 @@ self.addEventListener("push", (event) => {
       icon: "/weather.png",
       badge: "/weather.png",
       data: { url: payload.url || "/" },
-    }),
+    })
   );
 });
 
@@ -98,6 +107,6 @@ self.addEventListener("notificationclick", (event) => {
       const existing = clients.find((client) => client.url === targetUrl);
       if (existing) return existing.focus();
       return self.clients.openWindow(targetUrl);
-    }),
+    })
   );
 });

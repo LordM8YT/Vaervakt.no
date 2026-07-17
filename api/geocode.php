@@ -11,20 +11,19 @@ try {
         if ($lat < -90 || $lat > 90 || $lon < -180 || $lon > 180) {
             vv_error('Koordinatene ser ikke gyldige ut.');
         }
-        $url = 'https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=' . rawurlencode((string) $lat) . '&lon=' . rawurlencode((string) $lon) . '&zoom=16&addressdetails=1&accept-language=nb';
+        $url = 'https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=' . rawurlencode((string) $lat) . '&lon=' . rawurlencode((string) $lon) . '&zoom=14&addressdetails=1&accept-language=nb';
         $data = vv_http_get_json($url, [], 8);
         $address = is_array($data['address'] ?? null) ? $data['address'] : [];
-        $name = $address['quarter']
-            ?? $address['suburb']
+        $name = $address['suburb']
             ?? $address['city_district']
-            ?? $address['neighbourhood']
-            ?? $address['hamlet']
+            ?? $address['borough']
             ?? $address['village']
             ?? $address['town']
             ?? $address['city']
-            ?? $data['name']
+            ?? $address['municipality']
+            ?? $address['county']
             ?? 'Din posisjon';
-        $city = $address['city'] ?? $address['town'] ?? $address['municipality'] ?? '';
+        $city = $address['city'] ?? $address['town'] ?? $address['municipality'] ?? $address['county'] ?? '';
         $label = trim((string) $name . ($city !== '' && $city !== $name ? ', ' . $city : ''));
 
         vv_json([

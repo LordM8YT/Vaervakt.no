@@ -19,7 +19,7 @@ slettingshenvendelser behandles innen lovens frister.
 
 | Formål | Opplysninger | Grunnlag | Mottakere | Sletting |
 | --- | --- | --- | --- | --- |
-| Vær for valgt sted | Koordinater eller søket sted | GDPR 6(1)(b), levere forespurt funksjon | MET, Kartverket/Geonorge, OSMF Nominatim | Ikke lagret av Værvakt |
+| Vær for valgt sted | Koordinater eller søket sted. GPS-posisjonen caches med full nettleserpresisjon lokalt på enheten | GDPR 6(1)(b), levere forespurt funksjon | MET, Kartverket/Geonorge, OSMF Nominatim. Stedscachen deles ikke med Værvakts server | Lokal cache slettes av brukeren eller med nettleserdata |
 | Lokale rapporter | Valgfritt alias, værtype, temperatur, sted, koordinater avrundet til 2 desimaler | GDPR 6(1)(f), tilby og moderere lokale rapporter | Offentlig API uten koordinater, andre besøkende, Webhuset | Offentlig i maks 7 dager, slettes senest etter 30 dager |
 | Misbruksvern for rapporter | Pseudonyme HMAC-verdier av IP og User-Agent | GDPR 6(1)(f), sikkerhet, moderering og spamvern | Webhuset/databaseadministrator | Rate limit: maks 60 minutter. Misbruksvarsel: senest når rapporten slettes, maks 30 dager |
 | Badetemperatur til Yr | Badeplass, temperatur, tidspunkt, eksakte koordinater | GDPR 6(1)(b), levere uttrykkelig forespurt innsending | Yr/MET, Webhuset | Lokal leveringslogg: 30 dager |

@@ -62,10 +62,7 @@ function vv_reports_table(PDO $pdo): void
             PRIMARY KEY (id),
             UNIQUE KEY uq_report_flag_client (report_id, client_hash),
             KEY idx_report_flags_created (created_at),
-            KEY idx_report_flags_client (client_hash, created_at),
-            CONSTRAINT fk_report_flags_report
-                FOREIGN KEY (report_id) REFERENCES weather_reports(id)
-                ON DELETE CASCADE
+            KEY idx_report_flags_client (client_hash, created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
 }
@@ -284,7 +281,21 @@ function vv_reports_cleanup(PDO $pdo): void
         : ($hoursSetting !== '' ? (int) $hoursSetting : 720);
     $retentionHours = max(168, min(720, $retentionHours));
 
+    // Unngå database-FK her: eldre installasjoner kan ha en annen id-type,
+    // og enkelte delte MySQL-miljøer tillater ikke å opprette constrainten.
+    $pdo->exec("
+        DELETE flags
+        FROM weather_report_flags AS flags
+        INNER JOIN weather_reports AS reports ON reports.id = flags.report_id
+        WHERE reports.created_at < (NOW() - INTERVAL {$retentionHours} HOUR)
+    ");
     $pdo->exec("DELETE FROM weather_reports WHERE created_at < (NOW() - INTERVAL {$retentionHours} HOUR)");
+    $pdo->exec("
+        DELETE flags
+        FROM weather_report_flags AS flags
+        LEFT JOIN weather_reports AS reports ON reports.id = flags.report_id
+        WHERE reports.id IS NULL
+    ");
     $pdo->exec('DELETE FROM weather_report_rate_limits WHERE expires_at <= NOW()');
     $pdo->exec(
         'UPDATE weather_reports

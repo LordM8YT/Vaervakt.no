@@ -186,8 +186,20 @@ function admin_handle_action(PDO $pdo): ?string
     $id = (int) ($_POST['id'] ?? 0);
 
     if ($action === 'delete_report' && $id > 0 && admin_table_exists($pdo, 'weather_reports')) {
-        $stmt = $pdo->prepare('DELETE FROM weather_reports WHERE id = ? LIMIT 1');
-        $stmt->execute([$id]);
+        $pdo->beginTransaction();
+        try {
+            if (admin_table_exists($pdo, 'weather_report_flags')) {
+                $pdo->prepare('DELETE FROM weather_report_flags WHERE report_id = ?')->execute([$id]);
+            }
+            $stmt = $pdo->prepare('DELETE FROM weather_reports WHERE id = ? LIMIT 1');
+            $stmt->execute([$id]);
+            $pdo->commit();
+        } catch (Throwable $error) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $error;
+        }
         return 'Rapporten ble slettet.';
     }
 

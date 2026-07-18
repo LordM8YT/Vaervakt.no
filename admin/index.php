@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/api/bootstrap.php';
+require_once dirname(__DIR__) . '/api/report-lib.php';
 require_once dirname(__DIR__) . '/api/station-lib.php';
 
 session_name('vaervakt_admin');
@@ -137,12 +138,13 @@ function admin_fetch_all(PDO $pdo, string $table, string $sql): array
 function admin_report_scope(): string
 {
     $scope = (string) ($_GET['reports'] ?? 'fresh');
-    return in_array($scope, ['fresh', 'old', 'all'], true) ? $scope : 'fresh';
+    return in_array($scope, ['fresh', 'flagged', 'old', 'all'], true) ? $scope : 'fresh';
 }
 
 function admin_report_scope_where(string $scope): string
 {
     return match ($scope) {
+        'flagged' => "(moderation_status IN ('review', 'hidden') OR flag_count > 0)",
         'old' => 'created_at < (NOW() - INTERVAL 7 DAY)',
         'all' => '1=1',
         default => 'created_at >= (NOW() - INTERVAL 7 DAY)',
@@ -187,6 +189,32 @@ function admin_handle_action(PDO $pdo): ?string
         $stmt = $pdo->prepare('DELETE FROM weather_reports WHERE id = ? LIMIT 1');
         $stmt->execute([$id]);
         return 'Rapporten ble slettet.';
+    }
+
+    if ($action === 'hide_report' && $id > 0 && admin_table_exists($pdo, 'weather_reports')) {
+        $reason = trim((string) ($_POST['reason'] ?? ''));
+        $reason = $reason !== '' ? vv_limit($reason, 240) : 'Skjult av administrator.';
+        $stmt = $pdo->prepare("UPDATE weather_reports SET moderation_status = 'hidden', moderation_reason = ?, moderated_at = NOW() WHERE id = ? LIMIT 1");
+        $stmt->execute([$reason, $id]);
+        return 'Rapporten er skjult fra offentlig visning.';
+    }
+
+    if ($action === 'restore_report' && $id > 0 && admin_table_exists($pdo, 'weather_reports')) {
+        $pdo->beginTransaction();
+        try {
+            $stmt = $pdo->prepare("UPDATE weather_reports SET moderation_status = 'visible', moderation_reason = NULL, moderated_at = NOW(), flag_count = 0 WHERE id = ? LIMIT 1");
+            $stmt->execute([$id]);
+            if (admin_table_exists($pdo, 'weather_report_flags')) {
+                $pdo->prepare('DELETE FROM weather_report_flags WHERE report_id = ?')->execute([$id]);
+            }
+            $pdo->commit();
+        } catch (Throwable $error) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $error;
+        }
+        return 'Rapporten er godkjent og synlig igjen.';
     }
 
     if ($action === 'delete_glimpse' && $id > 0 && admin_table_exists($pdo, 'weather_glimpse_photos')) {
@@ -334,6 +362,8 @@ if ($isLoggedIn) {
     try {
         $pdo = vv_db();
         admin_track_table($pdo);
+        vv_reports_table($pdo);
+        vv_reports_cleanup($pdo);
         vv_stations_tables($pdo);
 
         if (($_GET['export'] ?? '') === 'reports') {
@@ -350,6 +380,8 @@ if ($isLoggedIn) {
             'reports24' => admin_count($pdo, 'weather_reports', 'created_at >= (NOW() - INTERVAL 24 HOUR)'),
             'reportsFresh' => admin_count($pdo, 'weather_reports', 'created_at >= (NOW() - INTERVAL 7 DAY)'),
             'reportsOld' => admin_count($pdo, 'weather_reports', 'created_at < (NOW() - INTERVAL 7 DAY)'),
+            'reportsFlagged' => admin_count($pdo, 'weather_reports', "(moderation_status IN ('review', 'hidden') OR flag_count > 0)"),
+            'reportsHidden' => admin_count($pdo, 'weather_reports', "moderation_status = 'hidden'"),
             'mapPoints' => admin_count($pdo, 'weather_reports', 'latitude IS NOT NULL AND longitude IS NOT NULL'),
             'activeGlimpses' => admin_count($pdo, 'weather_glimpse_photos', 'expires_at > NOW()'),
             'bathTotal' => admin_count($pdo, 'bath_temperature_reports'),
@@ -361,9 +393,35 @@ if ($isLoggedIn) {
         ];
 
         $reportCount = admin_count($pdo, 'weather_reports', $reportWhere);
-        $reports = admin_fetch_all($pdo, 'weather_reports', "SELECT *, created_at >= (NOW() - INTERVAL 7 DAY) AS is_fresh FROM weather_reports WHERE {$reportWhere} ORDER BY created_at DESC LIMIT 200");
-        $places = admin_fetch_all($pdo, 'weather_reports', 'SELECT location, COUNT(*) AS total FROM weather_reports GROUP BY location ORDER BY total DESC, location ASC LIMIT 12');
-        $weatherTypes = admin_fetch_all($pdo, 'weather_reports', 'SELECT weather_condition, COUNT(*) AS total FROM weather_reports GROUP BY weather_condition ORDER BY total DESC, weather_condition ASC LIMIT 12');
+        $reports = admin_fetch_all($pdo, 'weather_reports', "
+            SELECT
+                r.*,
+                r.created_at >= (NOW() - INTERVAL 7 DAY) AS is_fresh,
+                (
+                    SELECT GROUP_CONCAT(
+                        CONCAT(
+                            CASE f.reason
+                                WHEN 'inaccurate' THEN 'Feil værdata'
+                                WHEN 'spam' THEN 'Spam eller reklame'
+                                WHEN 'abusive' THEN 'Upassende eller støtende'
+                                WHEN 'privacy' THEN 'Personopplysninger'
+                                ELSE 'Annet'
+                            END,
+                            IF(f.details IS NULL OR f.details = '', '', CONCAT(': ', f.details))
+                        )
+                        ORDER BY f.created_at DESC
+                        SEPARATOR ' | '
+                    )
+                    FROM weather_report_flags f
+                    WHERE f.report_id = r.id
+                ) AS flag_summary
+            FROM weather_reports r
+            WHERE {$reportWhere}
+            ORDER BY FIELD(r.moderation_status, 'review', 'hidden', 'visible'), r.created_at DESC
+            LIMIT 200
+        ");
+        $places = admin_fetch_all($pdo, 'weather_reports', "SELECT location, COUNT(*) AS total FROM weather_reports WHERE moderation_status IN ('visible', 'review') GROUP BY location ORDER BY total DESC, location ASC LIMIT 12");
+        $weatherTypes = admin_fetch_all($pdo, 'weather_reports', "SELECT weather_condition, COUNT(*) AS total FROM weather_reports WHERE moderation_status IN ('visible', 'review') GROUP BY weather_condition ORDER BY total DESC, weather_condition ASC LIMIT 12");
         $visitsByPath = admin_fetch_all($pdo, 'site_visits', "SELECT path, COUNT(DISTINCT visitor_hash) AS unique_visitors, COUNT(*) AS views FROM site_visits WHERE created_at >= (NOW() - INTERVAL 24 HOUR) GROUP BY path ORDER BY views DESC LIMIT 12");
         $glimpses = admin_fetch_all($pdo, 'weather_glimpse_photos', 'SELECT * FROM weather_glimpse_photos ORDER BY created_at DESC LIMIT 80');
         $bathReports = admin_fetch_all($pdo, 'bath_temperature_reports', 'SELECT * FROM bath_temperature_reports ORDER BY created_at DESC LIMIT 120');
@@ -575,6 +633,27 @@ if ($isLoggedIn) {
     .subtabs { display: flex; gap: 8px; flex-wrap: wrap; }
     .status-fresh { border-color: rgba(52, 211, 153, .34); color: #bbf7d0; background: rgba(52, 211, 153, .12); }
     .status-old { border-color: rgba(251, 191, 36, .34); color: #fde68a; background: rgba(251, 191, 36, .12); }
+    .status-visible { border-color: rgba(56, 189, 248, .3); color: #bae6fd; background: rgba(56, 189, 248, .1); }
+    .status-review { border-color: rgba(251, 191, 36, .34); color: #fde68a; background: rgba(251, 191, 36, .12); }
+    .status-hidden { border-color: rgba(251, 113, 133, .35); color: #fecdd3; background: rgba(251, 113, 133, .14); }
+    .moderation-reason {
+      display: block;
+      max-width: 260px;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: .78rem;
+      line-height: 1.4;
+    }
+    .moderation-form {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .moderation-form input {
+      width: 170px;
+      min-height: 38px;
+      font-size: 13px;
+    }
     .thumb {
       width: 56px;
       height: 56px;
@@ -640,7 +719,7 @@ if ($isLoggedIn) {
       <section class="grid stats">
         <div class="stat"><span class="eyebrow">Unike 24t</span><strong><?= h((string) $stats['unique24']) ?></strong><p class="muted"><?= h((string) $stats['views24']) ?> sidevisninger</p></div>
         <div class="stat"><span class="eyebrow">Siste time</span><strong><?= h((string) $stats['lastHour']) ?></strong><p class="muted">Unike besøkende</p></div>
-        <div class="stat"><span class="eyebrow">Rapporter</span><strong><?= h((string) $stats['reportsTotal']) ?></strong><p class="muted"><?= h((string) $stats['reports24']) ?> siste 24t · <?= h((string) $stats['reportsFresh']) ?> ferske</p></div>
+        <div class="stat"><span class="eyebrow">Rapporter</span><strong><?= h((string) $stats['reportsTotal']) ?></strong><p class="muted"><?= h((string) $stats['reports24']) ?> siste 24t · <?= h((string) $stats['reportsFlagged']) ?> varslet</p></div>
         <div class="stat"><span class="eyebrow">Kartpunkter</span><strong><?= h((string) $stats['mapPoints']) ?></strong><p class="muted">Rapporter med koordinater</p></div>
         <div class="stat"><span class="eyebrow">Bildeglimt</span><strong><?= h((string) $stats['activeGlimpses']) ?></strong><p class="muted">Aktive nå</p></div>
         <div class="stat"><span class="eyebrow">Badetemp</span><strong><?= h((string) $stats['bathTotal']) ?></strong><p class="muted"><?= h((string) $stats['bathSent']) ?> sendt, <?= h((string) $stats['bathFailed']) ?> feilet</p></div>
@@ -903,25 +982,60 @@ if ($isLoggedIn) {
             <div class="card-body" style="padding-bottom:0">
               <div class="subtabs">
                 <a class="button <?= $reportScope === 'fresh' ? 'tab-active' : '' ?>" href="/admin/?view=reports&reports=fresh">Ferske <?= h((string) $stats['reportsFresh']) ?></a>
+                <a class="button <?= $reportScope === 'flagged' ? 'tab-active' : '' ?>" href="/admin/?view=reports&reports=flagged">Til vurdering <?= h((string) $stats['reportsFlagged']) ?></a>
                 <a class="button <?= $reportScope === 'old' ? 'tab-active' : '' ?>" href="/admin/?view=reports&reports=old">Eldre <?= h((string) $stats['reportsOld']) ?></a>
                 <a class="button <?= $reportScope === 'all' ? 'tab-active' : '' ?>" href="/admin/?view=reports&reports=all">Alle <?= h((string) $stats['reportsTotal']) ?></a>
               </div>
             </div>
             <div class="table-wrap">
               <table>
-                <thead><tr><th>Status</th><th>Tid</th><th>Bruker</th><th>Sted</th><th>Vær</th><th>Temp</th><th>Koordinater</th><th>Handling</th></tr></thead>
+                <thead><tr><th>Status</th><th>Tid</th><th>Bruker</th><th>Sted</th><th>Vær</th><th>Temp</th><th>Varsler</th><th>Koordinater</th><th>Handling</th></tr></thead>
                 <tbody>
                 <?php foreach ($reports as $report): ?>
-                  <?php $isFreshReport = (int) ($report['is_fresh'] ?? 0) === 1; ?>
+                  <?php
+                    $isFreshReport = (int) ($report['is_fresh'] ?? 0) === 1;
+                    $moderationStatus = in_array((string) ($report['moderation_status'] ?? ''), ['visible', 'review', 'hidden'], true)
+                        ? (string) $report['moderation_status']
+                        : 'visible';
+                    $moderationLabel = match ($moderationStatus) {
+                        'review' => 'Til vurdering',
+                        'hidden' => 'Skjult',
+                        default => 'Synlig',
+                    };
+                  ?>
                   <tr>
-                    <td><span class="pill <?= $isFreshReport ? 'status-fresh' : 'status-old' ?>"><?= $isFreshReport ? 'Fersk' : 'Historikk' ?> · <?= h(admin_report_age_label((string) $report['created_at'])) ?></span></td>
+                    <td>
+                      <span class="pill status-<?= h($moderationStatus) ?>"><?= h($moderationLabel) ?></span>
+                      <span class="moderation-reason"><?= $isFreshReport ? 'Fersk' : 'Historikk' ?> · <?= h(admin_report_age_label((string) $report['created_at'])) ?><?= !empty($report['moderation_reason']) ? '<br>' . h((string) $report['moderation_reason']) : '' ?></span>
+                    </td>
                     <td><?= h((string) $report['created_at']) ?></td>
                     <td><?= h((string) $report['username']) ?></td>
                     <td><?= h((string) $report['location']) ?></td>
                     <td><span class="pill"><?= h((string) $report['weather_condition']) ?></span></td>
-                    <td><strong><?= h((string) round((float) $report['temperature'])) ?>°</strong></td>
+                    <td><strong><?= h(number_format((float) $report['temperature'], 1, ',', '')) ?>°</strong></td>
+                    <td>
+                      <strong><?= h((string) ($report['flag_count'] ?? 0)) ?></strong>
+                      <?php if (!empty($report['flag_summary'])): ?>
+                        <span class="moderation-reason"><?= h((string) $report['flag_summary']) ?></span>
+                      <?php endif; ?>
+                    </td>
                     <td class="muted"><?= $report['latitude'] !== null ? h((string) $report['latitude'] . ', ' . (string) $report['longitude']) : 'Mangler' ?></td>
                     <td>
+                      <?php if ($moderationStatus !== 'hidden'): ?>
+                        <form method="post" class="moderation-form">
+                          <input type="hidden" name="csrf" value="<?= h(admin_csrf()) ?>">
+                          <input type="hidden" name="id" value="<?= h((string) $report['id']) ?>">
+                          <input name="reason" maxlength="240" placeholder="Begrunnelse">
+                          <button name="action" value="hide_report">Skjul</button>
+                        </form>
+                      <?php endif; ?>
+                      <?php if ($moderationStatus !== 'visible' || (int) ($report['flag_count'] ?? 0) > 0): ?>
+                        <form method="post" class="inline-form">
+                          <input type="hidden" name="csrf" value="<?= h(admin_csrf()) ?>">
+                          <input type="hidden" name="id" value="<?= h((string) $report['id']) ?>">
+                          <button class="primary" name="action" value="restore_report">Godkjenn</button>
+                        </form>
+                      <?php endif; ?>
                       <form method="post" class="inline-form">
                         <input type="hidden" name="csrf" value="<?= h(admin_csrf()) ?>">
                         <input type="hidden" name="id" value="<?= h((string) $report['id']) ?>">
@@ -931,7 +1045,7 @@ if ($isLoggedIn) {
                   </tr>
                 <?php endforeach; ?>
                 <?php if (!$reports): ?>
-                  <tr><td colspan="8" class="muted">Ingen rapporter i dette filteret.</td></tr>
+                  <tr><td colspan="9" class="muted">Ingen rapporter i dette filteret.</td></tr>
                 <?php endif; ?>
                 </tbody>
               </table>

@@ -2,117 +2,11 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/bootstrap.php';
-
-function vv_reports_table(PDO $pdo): void
-{
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS weather_reports (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            username VARCHAR(80) NOT NULL,
-            weather_condition VARCHAR(80) NOT NULL,
-            location VARCHAR(140) NOT NULL,
-            temperature DECIMAL(5,2) NOT NULL,
-            latitude DECIMAL(9,6) NULL,
-            longitude DECIMAL(9,6) NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            KEY idx_reports_created (created_at),
-            KEY idx_reports_location (location),
-            KEY idx_reports_coords (latitude, longitude)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    ");
-}
-
-function vv_reports_rate_table(PDO $pdo): void
-{
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS weather_report_rate_limits (
-            client_hash CHAR(64) NOT NULL,
-            window_started_at DATETIME NOT NULL,
-            hits SMALLINT UNSIGNED NOT NULL DEFAULT 1,
-            expires_at DATETIME NOT NULL,
-            PRIMARY KEY (client_hash),
-            KEY idx_report_rate_expiry (expires_at)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    ");
-}
-
-function vv_reports_cleanup(PDO $pdo): void
-{
-    $retentionHours = max(24, min(720, (int) vv_env('REPORT_RETENTION_HOURS', '168')));
-    $pdo->exec("DELETE FROM weather_reports WHERE created_at < (NOW() - INTERVAL {$retentionHours} HOUR)");
-    $pdo->exec('DELETE FROM weather_report_rate_limits WHERE expires_at <= NOW()');
-    $pdo->exec(
-        'UPDATE weather_reports
-         SET latitude = ROUND(latitude, 2), longitude = ROUND(longitude, 2)
-         WHERE (latitude IS NOT NULL AND latitude <> ROUND(latitude, 2))
-            OR (longitude IS NOT NULL AND longitude <> ROUND(longitude, 2))'
-    );
-}
+require_once __DIR__ . '/report-lib.php';
 
 function vv_reports_allowed_conditions(): array
 {
     return ['Sol / Klart', 'Delvis skyet', 'Skyet', 'Regn', 'Snø', 'Torden'];
-}
-
-function vv_reports_has_control_characters(string $value): bool
-{
-    return preg_match('/[\x00-\x1F\x7F]/u', $value) === 1;
-}
-
-function vv_reports_client_hash(): string
-{
-    $ip = trim((string) (
-        $_SERVER['HTTP_CF_CONNECTING_IP']
-        ?? $_SERVER['REMOTE_ADDR']
-        ?? 'unknown'
-    ));
-    $agent = vv_limit((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''), 180);
-    $secret = vv_env_first(
-        ['VISIT_HASH_SECRET', 'ADMIN_PASSWORD_HASH', 'VAPID_PRIVATE_KEY'],
-        DB_PASS
-    );
-    if ($secret === '') {
-        $secret = DB_NAME . '|vaervakt-report-secret';
-    }
-
-    $hourBucket = gmdate('Y-m-d-H');
-    return hash_hmac('sha256', $ip . '|' . $agent . '|' . $hourBucket, $secret);
-}
-
-function vv_reports_enforce_rate_limit(PDO $pdo): void
-{
-    $clientHash = vv_reports_client_hash();
-    $limit = max(1, min(30, (int) vv_env('REPORT_RATE_LIMIT', '6')));
-    $windowMinutes = max(1, min(60, (int) vv_env('REPORT_RATE_WINDOW_MINUTES', '10')));
-
-    $stmt = $pdo->prepare("
-        INSERT INTO weather_report_rate_limits
-            (client_hash, window_started_at, hits, expires_at)
-        VALUES (?, NOW(), 1, DATE_ADD(NOW(), INTERVAL 60 MINUTE))
-        ON DUPLICATE KEY UPDATE
-            hits = IF(
-                window_started_at < (NOW() - INTERVAL {$windowMinutes} MINUTE),
-                1,
-                hits + 1
-            ),
-            window_started_at = IF(
-                window_started_at < (NOW() - INTERVAL {$windowMinutes} MINUTE),
-                NOW(),
-                window_started_at
-            ),
-            expires_at = DATE_ADD(NOW(), INTERVAL 60 MINUTE)
-    ");
-    $stmt->execute([$clientHash]);
-
-    $check = $pdo->prepare(
-        'SELECT hits FROM weather_report_rate_limits WHERE client_hash = ? LIMIT 1'
-    );
-    $check->execute([$clientHash]);
-    if ((int) $check->fetchColumn() > $limit) {
-        header('Retry-After: ' . ($windowMinutes * 60));
-        vv_error("Du har sendt mange rapporter på kort tid. Prøv igjen om {$windowMinutes} minutter.", 429);
-    }
 }
 
 function vv_report_icon(string $condition): string
@@ -136,7 +30,12 @@ function vv_reports_get(PDO $pdo): void
     $radiusKm = max(1, min(100, (float) ($_GET['radiusKm'] ?? 25)));
     $location = trim((string) ($_GET['location'] ?? $_GET['q'] ?? ''));
     $requestedMaxAgeHours = vv_float($_GET['maxAgeHours'] ?? null);
-    $maxAgeHours = (int) max(1, min(168, round($requestedMaxAgeHours ?? 24)));
+    $requestedMaxAgeDays = vv_float($_GET['maxAgeDays'] ?? null);
+    $maxAgeHours = $requestedMaxAgeHours
+        ?? ($requestedMaxAgeDays !== null ? $requestedMaxAgeDays * 24 : 24);
+    // Rapporter kan beholdes lenger for moderering, men skal aldri være
+    // offentlig tilgjengelige i mer enn sju dager.
+    $maxAgeHours = (int) max(1, min(168, round($maxAgeHours)));
     $terms = vv_location_terms($location);
 
     $scopeClauses = [];
@@ -158,7 +57,10 @@ function vv_reports_get(PDO $pdo): void
         $scopeParams[] = '%' . $term . '%';
     }
 
-    $clauses = ["created_at >= (NOW() - INTERVAL {$maxAgeHours} HOUR)"];
+    $clauses = [
+        "moderation_status IN ('visible', 'review')",
+        "created_at >= (NOW() - INTERVAL {$maxAgeHours} HOUR)",
+    ];
     $params = [];
     if ($scopeClauses) {
         $clauses[] = '(' . implode(' OR ', $scopeClauses) . ')';
@@ -170,29 +72,54 @@ function vv_reports_get(PDO $pdo): void
     $countStmt->execute($params);
     $total = (int) $countStmt->fetchColumn();
 
-    $stmt = $pdo->prepare("SELECT * FROM weather_reports{$where} ORDER BY created_at DESC LIMIT {$limit}");
+    $stmt = $pdo->prepare(
+        "SELECT * FROM weather_reports{$where} ORDER BY created_at DESC LIMIT {$limit}"
+    );
     $stmt->execute($params);
     $rows = $stmt->fetchAll() ?: [];
 
-    $reports = array_map(static function (array $row) use ($hasCoordinates, $lat, $lon): array {
-        $condition = (string) ($row['weather_condition'] ?? '');
-        $reportLat = $row['latitude'] !== null ? (float) $row['latitude'] : null;
-        $reportLon = $row['longitude'] !== null ? (float) $row['longitude'] : null;
-        $distanceKm = $hasCoordinates && $reportLat !== null && $reportLon !== null
-            ? round(vv_distance_km((float) $lat, (float) $lon, $reportLat, $reportLon), 1)
-            : null;
+    $oldClauses = [
+        "moderation_status IN ('visible', 'review')",
+        "created_at < (NOW() - INTERVAL {$maxAgeHours} HOUR)",
+    ];
+    $oldParams = [];
+    if ($scopeClauses) {
+        $oldClauses[] = '(' . implode(' OR ', $scopeClauses) . ')';
+        $oldParams = $scopeParams;
+    }
+    $oldStmt = $pdo->prepare(
+        'SELECT COUNT(*) FROM weather_reports WHERE ' . implode(' AND ', $oldClauses)
+    );
+    $oldStmt->execute($oldParams);
+    $hiddenOldReports = (int) $oldStmt->fetchColumn();
 
-        return [
-            'id' => (int) $row['id'],
-            'icon' => vv_report_icon($condition),
-            'time' => vv_relative_time((string) ($row['created_at'] ?? '')),
-            'reporter' => (string) ($row['username'] ?? 'Anonym'),
-            'condition' => $condition,
-            'location' => (string) ($row['location'] ?? ''),
-            'temp' => round((float) ($row['temperature'] ?? 0), 1),
-            'distanceKm' => $distanceKm,
-        ];
-    }, $rows);
+    $reports = array_map(
+        static function (array $row) use ($hasCoordinates, $lat, $lon): array {
+            $condition = (string) ($row['weather_condition'] ?? '');
+            $reportLat = $row['latitude'] !== null ? (float) $row['latitude'] : null;
+            $reportLon = $row['longitude'] !== null ? (float) $row['longitude'] : null;
+            $distanceKm = $hasCoordinates && $reportLat !== null && $reportLon !== null
+                ? round(vv_distance_km(
+                    (float) $lat,
+                    (float) $lon,
+                    $reportLat,
+                    $reportLon
+                ), 1)
+                : null;
+
+            return [
+                'id' => (int) $row['id'],
+                'icon' => vv_report_icon($condition),
+                'time' => vv_relative_time((string) ($row['created_at'] ?? '')),
+                'reporter' => (string) ($row['username'] ?? 'Anonym'),
+                'condition' => $condition,
+                'location' => (string) ($row['location'] ?? ''),
+                'temp' => round((float) ($row['temperature'] ?? 0), 1),
+                'distanceKm' => $distanceKm,
+            ];
+        },
+        $rows
+    );
 
     vv_json([
         'success' => true,
@@ -204,19 +131,20 @@ function vv_reports_get(PDO $pdo): void
             'mode' => 'fresh',
             'maxAgeHours' => $maxAgeHours,
             'maxAgeDays' => round($maxAgeHours / 24, 2),
-            'hiddenOldReports' => 0,
+            'hiddenOldReports' => $hiddenOldReports,
         ],
         'reports' => $reports,
     ]);
 }
 
-function vv_reports_post(PDO $pdo): void
+function vv_reports_post(PDO $pdo, array $input): void
 {
-    $input = vv_request_body();
     $usernameInput = $input['username'] ?? $input['user'] ?? '';
     $conditionInput = $input['condition'] ?? '';
     $locationInput = $input['location'] ?? '';
-    if (!is_string($usernameInput) || !is_string($conditionInput) || !is_string($locationInput)) {
+    if (!is_string($usernameInput)
+        || !is_string($conditionInput)
+        || !is_string($locationInput)) {
         vv_error('Visningsnavn, værtype og sted må være tekst.');
     }
 
@@ -281,7 +209,7 @@ function vv_reports_post(PDO $pdo): void
 
     vv_json([
         'success' => true,
-        'message' => 'Rapporten er sendt og slettes automatisk etter 7 dager.',
+        'message' => 'Rapporten er sendt og vises offentlig i opptil 7 dager.',
         'reportId' => (int) $pdo->lastInsertId(),
     ]);
 }
@@ -289,14 +217,20 @@ function vv_reports_post(PDO $pdo): void
 try {
     $pdo = vv_db();
     vv_reports_table($pdo);
-    vv_reports_rate_table($pdo);
     vv_reports_cleanup($pdo);
 
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         vv_reports_get($pdo);
     }
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        vv_reports_post($pdo);
+        $input = vv_request_body();
+        if (($input['action'] ?? '') === 'flag') {
+            vv_json([
+                'success' => true,
+                ...vv_reports_flag($pdo, $input),
+            ]);
+        }
+        vv_reports_post($pdo, $input);
     }
     vv_error('Metoden er ikke støttet.', 405);
 } catch (Throwable $error) {

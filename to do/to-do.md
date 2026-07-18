@@ -4,17 +4,17 @@ Denne filen er den samlede todo-listen for Værvakt.no.
 
 Større oppgaver kan også opprettes som egne GitHub Issues. Når en oppgave er fullført, endres `[ ]` til `[x]`.
 
-Sist oppdatert: 13. juli 2026. Oppgavene under **Nå – prioritert rekkefølge** gjennomføres ovenfra og ned. Resten av dokumentet er gruppert etter fagområde.
+Sist oppdatert: 18. juli 2026. Oppgavene under **Nå – prioritert rekkefølge** gjennomføres ovenfra og ned. Resten av dokumentet er gruppert etter fagområde.
 
 ---
 
 ## Nå – prioritert rekkefølge
 
-1. [ ] Moderering og misbruksvern for værrapporter
-   - [ ] La brukere rapportere feil eller misbruk
-   - [ ] Legg til modereringsstatus og handlinger i admin
-   - [ ] Skjul eller slett rapporter som er moderert
-   - [ ] Lag automatisk utløp/opprydding for gamle rapporter
+1. [x] Moderering og misbruksvern for værrapporter
+   - [x] La brukere rapportere feil eller misbruk
+   - [x] Legg til modereringsstatus og handlinger i admin
+   - [x] Skjul eller slett rapporter som er moderert
+   - [x] Lag automatisk utløp/opprydding for gamle rapporter
 
 2. [ ] Vis eksisterende værstasjoner i appen
    - [x] API for godkjente stasjoner og siste måling finnes
@@ -207,14 +207,14 @@ Sist oppdatert: 13. juli 2026. Oppgavene under **Nå – prioritert rekkefølge*
 
 ## Rapporter fra brukere
 
-- [ ] Rapporter feil eller misbruk
+- [x] Rapporter feil eller misbruk
 
-- [ ] Moderering av rapporter
-  - Modereringsstatus i databasen
-  - Handlinger og oversikt i admin
-  - Skjul modererte rapporter fra offentlig API
+- [x] Moderering av rapporter
+  - [x] Modereringsstatus i databasen
+  - [x] Handlinger og oversikt i admin
+  - [x] Skjul modererte rapporter fra offentlig API
 
-- [ ] Automatisk utløp og opprydding for gamle rapporter
+- [x] Automatisk utløp og opprydding for gamle rapporter
 
 - [ ] Filtrering av rapporter
   - [x] Sted
@@ -300,7 +300,7 @@ Sist oppdatert: 13. juli 2026. Oppgavene under **Nå – prioritert rekkefølge*
 
 - [ ] Mobilvennlig app-design
 
-- [ ] Lys og mørk modus
+- [x] Lys og mørk modus
 
 - [ ] PWA-forbedringer
   - Installerbar app
@@ -352,9 +352,9 @@ Siste måling: 2 minutter siden
 
 - [ ] Se API-feil og tilkoblingsfeil
 
-- [ ] Moderer brukerrapporter
+- [x] Moderer brukerrapporter
   - [x] Se og slette rapporter manuelt
-  - [ ] Modereringsstatus, begrunnelse og misbruksvarsler
+  - [x] Modereringsstatus, begrunnelse og misbruksvarsler
 
 - [ ] Blokker misbruk
 
@@ -485,6 +485,31 @@ Flytt ferdige oppgaver hit eller marker dem som `[x]`.
 - [x] Grunnintegrasjon for badetemperaturer fra og til Yr
 
 - [x] Rate limiting og strengere validering av værrapporter
+
+- [x] Moderering og misbruksvern for værrapporter
+  - Brukere kan varsle om feil værdata, spam, upassende innhold og personopplysninger
+  - Egen modereringskø med begrunnelse og handlinger i admin
+  - Automatisk skjuling etter flere uavhengige varsler
+  - Skjulte rapporter fjernes fra offentlig API
+  - Automatisk sletting etter konfigurerbar lagringstid
+
+- [x] Personvernvennlig sted og GPS-cache i Svelte-appen
+  - Valgt sted huskes lokalt
+  - GPS-koordinater avrundes før lokal lagring
+  - Badeplass-POI-er caches lokalt med automatisk utløp
+  - Posisjonsstatus viser sted og omtrentlig nøyaktighet
+
+- [x] Forbedret værvisning i Svelte-grensesnittet
+  - Svelte 5 og Lucide-ikoner
+  - UV-indeks vises korrekt med én desimal
+  - Lys og mørk visning
+
+- [x] Stream Deck-plugin v0.4
+  - Svelte-basert innstillingspanel og knappgrafikk med Lucide
+  - Vær, badetemperatur og siste lokale rapport
+  - Temperaturer vises med én desimal
+  - Automatisk oppdatering hvert 5. eller 10. minutt
+  - Vanlige knappetrykk utløser ikke ekstra datahenting
 
 - [x] Grunnleggende rapportsystem
 - [x] Database for rapporter

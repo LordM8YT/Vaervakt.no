@@ -20,8 +20,8 @@ slettingshenvendelser behandles innen lovens frister.
 | Formål | Opplysninger | Grunnlag | Mottakere | Sletting |
 | --- | --- | --- | --- | --- |
 | Vær for valgt sted | Koordinater eller søket sted | GDPR 6(1)(b), levere forespurt funksjon | MET, Kartverket/Geonorge, OSMF Nominatim | Ikke lagret av Værvakt |
-| Lokale rapporter | Valgfritt alias, værtype, temperatur, sted, koordinater avrundet til 2 desimaler | GDPR 6(1)(f), tilby lokale rapporter | Offentlig API, andre besøkende, Webhuset | 7 dager |
-| Misbruksvern for rapporter | HMAC av IP og User-Agent | GDPR 6(1)(f), sikkerhet og spamvern | Webhuset/databaseadministrator | Maksimalt 60 minutter |
+| Lokale rapporter | Valgfritt alias, værtype, temperatur, sted, koordinater avrundet til 2 desimaler | GDPR 6(1)(f), tilby og moderere lokale rapporter | Offentlig API uten koordinater, andre besøkende, Webhuset | Offentlig i maks 7 dager, slettes senest etter 30 dager |
+| Misbruksvern for rapporter | Pseudonyme HMAC-verdier av IP og User-Agent | GDPR 6(1)(f), sikkerhet, moderering og spamvern | Webhuset/databaseadministrator | Rate limit: maks 60 minutter. Misbruksvarsel: senest når rapporten slettes, maks 30 dager |
 | Badetemperatur til Yr | Badeplass, temperatur, tidspunkt, eksakte koordinater | GDPR 6(1)(b), levere uttrykkelig forespurt innsending | Yr/MET, Webhuset | Lokal leveringslogg: 30 dager |
 | Teknisk drift | IP kan finnes i leverandørens tilgangs-/sikkerhetslogger | GDPR 6(1)(f), sikker og stabil drift | Webhuset og relevante API-leverandører | Følger verifisert leverandøravtale |
 
@@ -41,8 +41,9 @@ Risikoen reduseres ved at:
 
 - visningsnavn er valgfritt og brukeren oppfordres til å bruke kallenavn;
 - koordinater avrundes til omtrent én kilometer og utleveres ikke i API-et;
-- rapporter slettes etter 7 dager;
-- sikkerhetshash lagres separat og slettes senest etter 60 minutter;
+- rapporter tas ut av offentlig API etter maksimalt 7 dager og slettes fra databasen senest etter 30 dager;
+- hash for innsendingstakt lagres separat og slettes senest etter 60 minutter;
+- hash for misbruksvarsler kan beholdes sammen med varselet i maksimalt 30 dager, slik at én klient ikke telles flere ganger;
 - det lagres ikke e-post, konto eller andre direkte identifikatorer;
 - brukeren kan kreve retting eller sletting via kontaktpunktet.
 

@@ -495,9 +495,9 @@ Flytt ferdige oppgaver hit eller marker dem som `[x]`.
 
 - [x] Personvernvennlig sted og GPS-cache i Svelte-appen
   - Valgt sted huskes lokalt
-  - GPS-koordinater avrundes før lokal lagring
+  - GPS-koordinater beholdes med full nettleserpresisjon i lokal lagring
   - Badeplass-POI-er caches lokalt med automatisk utløp
-  - Posisjonsstatus viser sted og omtrentlig nøyaktighet
+  - GPS-oppslaget venter på høy presisjon og viser nøyaktigheten nettleseren rapporterer
 
 - [x] Forbedret værvisning i Svelte-grensesnittet
   - Svelte 5 og Lucide-ikoner

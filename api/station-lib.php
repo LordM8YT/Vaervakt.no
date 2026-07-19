@@ -309,19 +309,52 @@ function vv_station_public_coordinates(array $station): array
     return ['lat' => $lat, 'lon' => $lon, 'precision' => $precision];
 }
 
+function vv_station_online(?string $lastSeenAt): bool
+{
+    if ($lastSeenAt === null || trim($lastSeenAt) === '') {
+        return false;
+    }
+
+    $timestamp = strtotime($lastSeenAt);
+    if ($timestamp === false) {
+        return false;
+    }
+
+    $maxAgeMinutes = max(5, min(180, (int) vv_env('STATION_ONLINE_MAX_AGE_MINUTES', '20')));
+    $ageSeconds = time() - $timestamp;
+    return $ageSeconds >= -300 && $ageSeconds <= $maxAgeMinutes * 60;
+}
+
+function vv_station_public_timestamp(?string $value): ?string
+{
+    if ($value === null || trim($value) === '') {
+        return null;
+    }
+
+    try {
+        return (new DateTimeImmutable($value, new DateTimeZone('Europe/Oslo')))->format(DATE_ATOM);
+    } catch (Throwable) {
+        return null;
+    }
+}
+
 function vv_station_public_row(array $row): array
 {
     $coords = vv_station_public_coordinates($row);
+    $lastSeenAt = $row['last_seen_at'] !== null ? (string) $row['last_seen_at'] : null;
     return [
         'id' => (string) $row['public_id'],
         'name' => (string) $row['public_name'],
         'provider' => (string) ($row['provider'] ?? 'Værstasjon'),
         'location' => (string) $row['location_name'],
+        'verified' => true,
+        'sourceType' => 'automatic_station',
+        'online' => vv_station_online($lastSeenAt),
         'lat' => $coords['lat'],
         'lon' => $coords['lon'],
         'coordinatePrecision' => $coords['precision'],
         'capabilities' => vv_station_decode_capabilities($row['capabilities'] ?? null),
-        'lastSeenAt' => $row['last_seen_at'] !== null ? (string) $row['last_seen_at'] : null,
+        'lastSeenAt' => vv_station_public_timestamp($lastSeenAt),
         'reading' => $row['reading_id'] !== null ? [
             'id' => (int) $row['reading_id'],
             'temperature' => $row['temperature'] !== null ? (float) $row['temperature'] : null,
@@ -331,8 +364,8 @@ function vv_station_public_row(array $row): array
             'rainTotal' => $row['rain_total'] !== null ? (float) $row['rain_total'] : null,
             'windSpeed' => $row['wind_speed'] !== null ? (float) $row['wind_speed'] : null,
             'windDirection' => $row['wind_direction'] !== null ? (float) $row['wind_direction'] : null,
-            'observedAt' => (string) $row['observed_at'],
-            'receivedAt' => (string) $row['received_at'],
+            'observedAt' => vv_station_public_timestamp((string) $row['observed_at']),
+            'receivedAt' => vv_station_public_timestamp((string) $row['received_at']),
         ] : null,
     ];
 }

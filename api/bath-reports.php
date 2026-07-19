@@ -1,7 +1,9 @@
 <?php
 declare(strict_types=1);
 
-require __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/bath-location-lib.php';
+require_once __DIR__ . '/rate-limit-lib.php';
 
 function vv_bath_reports_table(PDO $pdo): void
 {
@@ -9,6 +11,7 @@ function vv_bath_reports_table(PDO $pdo): void
         "CREATE TABLE IF NOT EXISTS bath_temperature_reports (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             name VARCHAR(140) NOT NULL,
+            yr_location_id VARCHAR(64) NULL,
             reporter VARCHAR(80) NULL,
             temperature DECIMAL(4,1) NOT NULL,
             latitude DECIMAL(10,6) NOT NULL,
@@ -23,10 +26,19 @@ function vv_bath_reports_table(PDO $pdo): void
             yr_sent_at DATETIME NULL,
             PRIMARY KEY (id),
             KEY idx_bath_created (created_at),
+            KEY idx_bath_location (yr_location_id, created_at),
             KEY idx_bath_status (yr_status, created_at),
             KEY idx_bath_coords (latitude, longitude)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
+
+    if (!vv_table_has_column($pdo, 'bath_temperature_reports', 'yr_location_id')) {
+        $pdo->exec(
+            'ALTER TABLE bath_temperature_reports
+             ADD COLUMN yr_location_id VARCHAR(64) NULL AFTER name,
+             ADD KEY idx_bath_location (yr_location_id, created_at)'
+        );
+    }
 }
 
 function vv_bath_reports_cleanup(PDO $pdo): void
@@ -154,23 +166,48 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $body = vv_request_body();
-$name = vv_limit(trim((string) ($body['name'] ?? $body['locationName'] ?? '')), 140);
+$locationId = vv_bath_location_id($body['locationId'] ?? $body['yrLocationId'] ?? '');
 $temperature = vv_float($body['temperature'] ?? null);
-$lat = vv_float($body['lat'] ?? $body['latitude'] ?? null);
-$lon = vv_float($body['lon'] ?? $body['longitude'] ?? null);
 $heatedWater = vv_bath_bool($body['heatedWater'] ?? $body['heated_water'] ?? false);
 
-if ($name === '') {
-    vv_error('Skriv inn navnet på badeplassen.');
+if ($locationId === '') {
+    vv_error('Velg en badeplass fra Yr-listen før du sender.');
 }
 
 if ($temperature === null || $temperature < -2 || $temperature > 45) {
     vv_error('Badetemperaturen må være mellom -2 og 45 °C.');
 }
 
-if ($lat === null || $lon === null || $lat < -90 || $lat > 90 || $lon < -180 || $lon > 180) {
-    vv_error('Badeplassen må ha gyldige koordinater.');
+try {
+    $pdo = vv_db();
+    vv_bath_reports_table($pdo);
+    vv_public_rate_limits_table($pdo);
+    vv_enforce_public_rate_limit(
+        $pdo,
+        'bath-report',
+        (int) vv_env('BATH_RATE_LIMIT', '5'),
+        (int) vv_env('BATH_RATE_WINDOW_MINUTES', '30'),
+        'Du har sendt mange badetemperaturer på kort tid. Prøv igjen senere.'
+    );
+} catch (Throwable $error) {
+    error_log('bath rate limit failed: ' . $error->getMessage());
+    vv_error('Kunne ikke håndtere badetemperaturen akkurat nå.', 500);
 }
+
+try {
+    $yrLocation = vv_bath_location_detail($locationId);
+} catch (Throwable $error) {
+    error_log('bath location validation failed: ' . $error->getMessage());
+    vv_error('Yr kunne ikke bekrefte badeplassen akkurat nå. Prøv igjen senere.', 502);
+}
+
+if ($yrLocation === null) {
+    vv_error('Yr kunne ikke matche den valgte badeplassen. Søk og velg den på nytt.');
+}
+
+$name = $yrLocation['name'];
+$lat = $yrLocation['lat'];
+$lon = $yrLocation['lon'];
 
 $time = new DateTimeImmutable('now', new DateTimeZone('Europe/Oslo'));
 $entry = [
@@ -188,17 +225,16 @@ if ($requestJson === false) {
 }
 
 try {
-    $pdo = vv_db();
-    vv_bath_reports_table($pdo);
     vv_bath_reports_cleanup($pdo);
 
     $insert = $pdo->prepare(
         'INSERT INTO bath_temperature_reports
-        (name, reporter, temperature, latitude, longitude, heated_water, yr_status, yr_request)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        (name, yr_location_id, reporter, temperature, latitude, longitude, heated_water, yr_status, yr_request)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
     $insert->execute([
         $name,
+        $locationId,
         null,
         round($temperature, 1),
         round($lat, 6),
@@ -229,6 +265,8 @@ try {
             'message' => 'Badetemperaturen er sendt til Yr. Takk!',
             'status' => 'sent',
             'id' => $id,
+            'locationId' => $locationId,
+            'locationName' => $name,
         ], 201);
     } catch (Throwable $yrError) {
         $update = $pdo->prepare(

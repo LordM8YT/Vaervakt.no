@@ -4,7 +4,7 @@ Denne filen er den samlede todo-listen for Værvakt.no.
 
 Større oppgaver kan også opprettes som egne GitHub Issues. Når en oppgave er fullført, endres `[ ]` til `[x]`.
 
-Sist oppdatert: 18. juli 2026. Oppgavene under **Nå – prioritert rekkefølge** gjennomføres ovenfra og ned. Resten av dokumentet er gruppert etter fagområde.
+Sist oppdatert: 19. juli 2026. Oppgavene under **Nå – prioritert rekkefølge** gjennomføres ovenfra og ned. Resten av dokumentet er gruppert etter fagområde.
 
 ---
 
@@ -16,34 +16,48 @@ Sist oppdatert: 18. juli 2026. Oppgavene under **Nå – prioritert rekkefølge*
    - [x] Skjul eller slett rapporter som er moderert
    - [x] Lag automatisk utløp/opprydding for gamle rapporter
 
-2. [ ] Vis eksisterende værstasjoner i appen
+2. [x] Vis eksisterende værstasjoner i appen
    - [x] API for godkjente stasjoner og siste måling finnes
-   - [ ] Hent nærmeste godkjente stasjoner for valgt sted eller GPS-posisjon
-   - [ ] Vis online/offline og tidspunkt for siste oppdatering
-   - [ ] Skill stasjonsmålinger tydelig fra brukerrapporter
+   - [x] Hent nærmeste godkjente stasjoner for valgt sted eller GPS-posisjon
+   - [x] Vis online/offline og tidspunkt for siste oppdatering
+   - [x] Skill stasjonsmålinger tydelig fra brukerrapporter
 
-3. [ ] Fullfør stedssøk og samlet områdestatus
+3. [x] Gjør appen testklar for åpen beta
+   - [x] Vis tydelig at appen er i beta og hva testere bør prøve
+   - [x] Legg til en enkel, personvernvennlig tilbakemeldingskanal uten brukerkrav
+   - [x] Vis tydelig sendestatus og hindre dobbeltinnsending i offentlige skjemaer
+   - [x] Fjern identiske stedsresultater og vis region når det skiller like stedsnavn
+   - [x] Test førstegangsbruk med GPS, avslått GPS og manuelt søk
+   - [x] Test vær, lokalt og bad på mobil, nettbrett og desktop
+   - [x] Kontroller tastaturnavigasjon, fokus og lesbare feil-/tomtilstander
+   - [x] Lukk alle blokkerende feil før testlenken deles offentlig
+
+4. [x] Fullfør stedssøk og samlet områdestatus
    - [x] Brukere kan søke etter et sted
    - [x] Valgt sted huskes lokalt
    - [x] Vis rapporter, antall og siste aktivitet for valgt sted
-   - [ ] Vis tilgjengelige værstasjoner i området
-   - [ ] Oppsummer rapporter, stasjoner og siste aktivitet i én områdestatus
+   - [x] Vis tilgjengelige værstasjoner i området
+   - [x] Oppsummer rapporter, stasjoner og siste aktivitet i én områdestatus
 
-4. [ ] Badeplassforslag fra Yr
-   - [ ] Legg til autocomplete for badeplassnavn
-   - [ ] Bruk valgt Yr-badeplass og koordinater ved innsending
-   - [ ] Vis en tydelig melding hvis Yr ikke kan matche badeplassen
+5. [x] Badeplassforslag fra Yr
+   - [x] Legg til autocomplete for badeplassnavn
+   - [x] Bruk valgt Yr-badeplass og koordinater ved innsending
+   - [x] Vis en tydelig melding hvis Yr ikke kan matche badeplassen
 
-5. [ ] Utvid misbruksvernet til øvrige offentlige skriveendepunkter
+6. [x] Utvid misbruksvernet til øvrige offentlige skriveendepunkter
    - [x] Rate limiting og feltvalidering for værrapporter
-   - [ ] Rate limiting for Værglimt
-   - [ ] Rate limiting for badetemperaturer
-   - [ ] Rate limiting for hub-innlegg, stemmer og besøkslogging
+   - [x] Værglimt er avviklet og skriveendepunktet svarer 410
+   - [x] Rate limiting for badetemperaturer
+   - [x] Hub, stemmer og individuell besøkslogging er avviklet
 
-6. [ ] Avklar første versjon av push-varsler
-   - [ ] Velg hvilke varsler som skal lanseres først
-   - [ ] Definer samtykke, geografisk område og varslingsgrenser
+7. [ ] Avklar første versjon av push-varsler
+   - [x] Velg frost og sterk vind fra MET-prognosen som første varsler
+   - [x] Definer samtykke, sted, dataminimering og varslingsgrenser
    - [ ] Test VAPID-oppsett og levering før varsler aktiveres
+     - [x] Produksjon har offentlig/privat VAPID-nøkkel og subject
+     - [x] Service worker kan motta push og åpne riktig URL
+     - [x] Skjult abonnement-endepunkt med validering og misbruksvern
+     - [ ] Senderjobb og ende-til-ende-levering
 
 ---
 
@@ -65,11 +79,11 @@ Sist oppdatert: 18. juli 2026. Oppgavene under **Nå – prioritert rekkefølge*
 - [ ] Verifiserte værstasjoner
   - [x] Godkjenning og deaktivering i admin
   - [x] Kun godkjente stasjoner vises i offentlig API
-  - [ ] Vis merke for verifisert stasjon i appen
-  - [ ] Vis om stasjonen er online
-  - [ ] Vis siste oppdatering
+  - [x] Vis merke for verifisert stasjon i appen
+  - [x] Vis om stasjonen er online
+  - [x] Vis siste oppdatering
   - [ ] Vis datakvalitet
-  - [ ] Skill mellom automatisk måling og brukerrapport
+  - [x] Skill mellom automatisk måling og brukerrapport
 
 - [ ] Home Assistant-integrasjon
   - [x] REST-endepunkt
@@ -177,10 +191,10 @@ Sist oppdatert: 18. juli 2026. Oppgavene under **Nå – prioritert rekkefølge*
 
 - [x] Sende badetemperaturer til Yr via serveren
 
-- [ ] Badeplassforslag/autocomplete mot Yr
-  - Søk etter godkjente badeplassnavn
-  - Bruk ID og koordinater fra valgt treff
-  - Reduser avviste innsendinger til Yr
+- [x] Badeplassforslag/autocomplete mot Yr
+  - [x] Søk etter godkjente badeplassnavn
+  - [x] Bruk ID og koordinater fra valgt treff
+  - [x] Reduser avviste innsendinger til Yr
 
 - [ ] Egen søkeside for badeplasser
 
@@ -225,7 +239,7 @@ Sist oppdatert: 18. juli 2026. Oppgavene under **Nå – prioritert rekkefølge*
 
 - [ ] Skill tydelig mellom datakilder
   - [x] Brukerrapport og badetemperatur
-  - [ ] Værstasjonsmåling
+  - [x] Værstasjonsmåling
   - [ ] Offisielt farevarsel
 
 - [ ] Bilder på rapporter
@@ -236,15 +250,19 @@ Sist oppdatert: 18. juli 2026. Oppgavene under **Nå – prioritert rekkefølge*
 
 ## Varsler
 
-- [ ] Pushvarsel ved torden
+- [ ] Pushvarsel ved torden (etter v1)
 
 - [ ] Pushvarsel ved sterk vind
+  - [x] V1-grense: minst 15,0 m/s innen 12 timer
+  - [ ] Abonnement, senderjobb og levering
 
 - [ ] Pushvarsel ved frost
+  - [x] V1-grense: 0,0 °C eller lavere innen 12 timer
+  - [ ] Abonnement, senderjobb og levering
 
-- [ ] Pushvarsel ved kraftig regn
+- [ ] Pushvarsel ved kraftig regn (etter v1)
 
-- [ ] Pushvarsel ved snøfare
+- [ ] Pushvarsel ved snøfare (etter v1)
 
 - [ ] Pushvarsel ved nye rapporter i nærheten
 
@@ -371,14 +389,16 @@ Siste måling: 2 minutter siden
 
 ## Sikkerhet
 
-- [ ] Rate limiting på API-endepunkter
+- [x] Rate limiting på offentlige skriveendepunkter
   - [x] Værrapporter
-  - [ ] Værglimt, badetemperatur og øvrige offentlige endepunkter
+  - [x] Badetemperaturer
+  - [x] Værglimt, hub, stemmer og besøkslogging er avviklet
 
-- [ ] Valider alle innsendte målinger
+- [x] Valider alle innsendte målinger
   - [x] Temperatur, værtype, koordinater og feltlengder for værrapporter
   - [x] Gyldige måleområder for værstasjoner
-  - [ ] Gjennomgå Værglimt, badetemperatur og hub
+  - [x] Badetemperatur valideres mot valgt Yr-ID og gyldig måleområde
+  - [x] Værglimt og hub er avviklet
 
 - [ ] CSRF-beskyttelse på skjemaer
   - [x] Adminhandlinger
@@ -484,6 +504,19 @@ Flytt ferdige oppgaver hit eller marker dem som `[x]`.
 
 - [x] Grunnintegrasjon for badetemperaturer fra og til Yr
 
+- [x] Validerte badeplassforslag fra Yr
+  - Tastaturvennlig autocomplete med region og tydelig ingen-treff-melding
+  - Backend bekrefter Yr-ID og bruker Yr-koordinater før innsending
+
+- [x] Åpen beta-gjennomgang
+  - Førstegangsbruk med godkjent og avslått GPS samt manuelt søk
+  - Vær, lokalt og bad på mobil, nettbrett og desktop
+  - Synlig tastaturfokus, fokusfeller, fokusretur og tydelige feil-/tomtilstander
+
+- [x] Misbruksvern for badetemperaturer
+  - Pseudonym rate limiting før Yr-oppslag
+  - Værglimt, hub, stemmer og individuell besøkslogging er avviklet
+
 - [x] Rate limiting og strengere validering av værrapporter
 
 - [x] Moderering og misbruksvern for værrapporter
@@ -511,9 +544,21 @@ Flytt ferdige oppgaver hit eller marker dem som `[x]`.
   - Automatisk oppdatering hvert 5. eller 10. minutt
   - Vanlige knappetrykk utløser ikke ekstra datahenting
 
+- [x] Visning av godkjente værstasjoner i appen
+  - Nærmeste stasjoner for valgt sted eller GPS-posisjon
+  - Verifisert merke, online/offline og siste oppdatering
+  - Temperatur og tilgjengelige sensorverdier
+  - Tydelig skille mellom automatiske målinger og brukerrapporter
+
+- [x] Samlet områdestatus for valgt sted
+  - MET-temperatur, aktive værstasjoner og brukerrapporter i ett overblikk
+  - Siste automatiske måling og tydelige utilgjengelig-/tomtilstander
+
 - [x] Grunnleggende rapportsystem
 - [x] Database for rapporter
-- [x] Push subscription-tabell
+- [ ] Push subscription-tabell
+  - [x] Skjult tabell og subscribe/update/unsubscribe-endepunkt
+  - [ ] Aktiver først når senderjobb og ende-til-ende-test er ferdig
 - [x] Første plan for værstasjonsintegrasjoner
 - [x] GitHub Issue for banner mode
 - [x] GitHub Issue for automatisk værstasjonstilkobling

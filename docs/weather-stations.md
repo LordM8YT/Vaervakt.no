@@ -67,6 +67,10 @@ GET /api/stations.php?lat=58.15&lon=7.95&radiusKm=25
 ```
 
 Responsen inneholder bare godkjente stasjoner. Koordinater kan være eksakte, avrundet til område eller skjult, avhengig av personvernvalget i admin.
+Med koordinater sorteres resultatet etter avstand. Hver stasjon har også
+`verified: true`, `sourceType: "automatic_station"`, `online`, `lastSeenAt`
+og siste måling. Standardgrensen for `online` er data mottatt de siste
+20 minuttene og kan endres med `STATION_ONLINE_MAX_AGE_MINUTES`.
 
 ## Home Assistant-eksempel
 

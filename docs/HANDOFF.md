@@ -13,14 +13,19 @@ Backup av gammel app:
 - `assets/js/live-enhancements.js`: Lite klientlag lastet før React-bundlen. Legger rapporthistorikk, favoritter, UV-status og push-registrering uten å endre minifisert build.
 - `api/bootstrap.php`: Felles konfig, `.env`, PDO og helpers.
 - `api/weather.php`: MET-varsel og valgfri Yr badetemperatur for visning.
+- `api/bath-locations.php`: Serverproxy for søk etter godkjente Yr-badeplasser.
 - `api/reports.php`: Lokale værrapporter. Public GET viser bare synlige rapporter fra maksimalt de siste 7 dagene. Eksakte rapportkoordinater returneres ikke; avstand beregnes på serveren.
 - `api/report-lib.php`: Tabeller, rate limiting, misbruksvarsler, modereringsstatus og automatisk opprydding for værrapporter.
-- `api/glimpses.php`: Værglimt med bilde, levetid og automatisk utløp.
-- `api/bath-reports.php`: Innsending av badetemperaturer, lokal logging og forwarding til Yr.
-- `api/track.php`: Anonym besøkslogging for admin-statistikk.
+- `api/glimpses.php`: Avviklet Værglimt-endepunkt. Rydder eldre data og svarer 410.
+- `api/bath-reports.php`: Validert innsending av badetemperaturer, lokal leveringslogg og videresending til Yr.
+- `api/rate-limit-lib.php`: Felles, pseudonymt og kortvarig rate-limit-lager for offentlige handlinger.
+- `api/push.php`: Skjult subscribe/update/unsubscribe-lager for push v1; frontend er ikke aktivert.
+- `api/hub.php`: Avviklet hub-endepunkt. Rydder eldre profiler, innlegg og stemmer og svarer 410.
+- `api/track.php`: Deaktivert individuell besøkslogging. Rydder eldre besøksrader.
 - `api/geocode.php`: Stedssøk via Nominatim og norsk reverse geocoding via Kartverket, med Nominatim som reserve.
 - `admin/index.php`: Desktop-only adminpanel med rapporter, badetemperaturer, bildeglimt og trafikk.
 - `manifest.json` og `service-worker.js`: PWA.
+- `docs/push-v1.md`: Besluttet første varseltyper, samtykkeflyt, dataminimering og teknisk leveringsgate.
 
 ## Miljøvariabler
 
@@ -31,25 +36,29 @@ Backup av gammel app:
 - `REPORT_RETENTION_DAYS`: Lagring for moderering, maksimalt 30 dager.
 - `REPORT_RATE_LIMIT` og `REPORT_RATE_WINDOW_MINUTES`: Innsendingstakt per pseudonym klient.
 - `REPORT_FLAG_RATE_LIMIT`, `REPORT_FLAG_RATE_WINDOW_MINUTES` og `REPORT_AUTO_HIDE_FLAGS`: Grenser for misbruksvarsler og automatisk skjuling.
+- `BATH_RATE_LIMIT` og `BATH_RATE_WINDOW_MINUTES`: Innsendingstakt for badetemperaturer per pseudonym klient.
+- `PUSH_RATE_LIMIT`, `PUSH_RATE_WINDOW_MINUTES` og `PUSH_SUBSCRIPTION_RETENTION_DAYS`: Misbruksvern og slettetid for push-abonnementer.
 
 ## Personvern
 
-Værglimt bruker bare visningsnavn og PIN. PIN lagres med `password_hash()`. Det samles ikke inn e-post eller telefonnummer i v2-starten.
+Værglimt, hub, stemmer og individuell besøkslogging er avviklet. Endepunktene
+rydder eldre data i stedet for å ta imot nytt innhold.
 
-Badetemperaturer lagrer badeplassnavn, temperatur, koordinater, valgfritt visningsnavn og status fra Yr. API-nøkkelen lagres aldri i databasen eller frontend.
+Badetemperaturer lagrer badeplassnavn, Yr-ID, temperatur, koordinater og status
+fra Yr i en teknisk leveringslogg. Innsendernavn lagres ikke. API-nøkkelen
+lagres aldri i databasen eller frontend. Innsendingstakten begrenses med et
+kortvarig HMAC-hash; IP-adressen lagres ikke i klartekst i rate-limit-tabellen.
 
 ## Badetemperatur til Yr
 
-Brukeren sender badeplassnavn og temperatur fra appen. Backend legger til koordinater, tidspunkt og `heatedWater`, lagrer forsøket lokalt i `bath_temperature_reports`, og sender JSON videre til `https://badetemperaturer.yr.no/api/registrere`.
+Brukeren søker først etter en godkjent Yr-badeplass via Værvakts serverproxy. Appen sender valgt `locationId` og temperatur. Backend bekrefter ID-en mot Yr, overstyrer navn og koordinater med verdiene fra Yr, legger til tidspunkt og `heatedWater`, lagrer forsøket lokalt i `bath_temperature_reports`, og sender JSON videre til `https://badetemperaturer.yr.no/api/registrere`.
 
-Yr krever at badeplassnavnet kan matches mot Yr sitt søk eller nærmeste sted. Hvis Yr avviser innsendingen, blir status `failed` i adminpanelet.
+Fritekst godtas ikke lenger ved innsending fra appen. Hvis Yr ikke kan bekrefte badeplassen eller avviser innsendingen, får brukeren en tydelig melding og leveringsstatusen blir synlig i adminpanelet.
 
 ## Neste naturlige steg
 
 Lokale værrapporter har nå tidsfilter, antall, siste aktivitet, avstand, lagring av sist valgte sted og GPS-autofyll. API-et validerer temperatur, værtype, koordinater og feltlengder, begrenser innsendinger per klient og har misbruksrapportering med modereringskø. Rapporter skjules automatisk etter et konfigurerbart antall uavhengige varsler og slettes automatisk etter `REPORT_RETENTION_DAYS`.
 
-1. Vise eksisterende godkjente værstasjoner, status og siste måling i appen.
-2. Bygge en samlet «Værvakt Nå»-status av MET-varsel, lokale stasjoner og brukerrapporter.
-3. Badeplassforslag/autocomplete mot Yr, slik at brukeren oftere velger et navn Yr kan matche.
-4. Utvide rate limiting til badetemperatur, Værglimt og øvrige offentlige skriveendepunkter.
-5. Push-varsler når VAPID og varslingsstrategi er klar.
+1. Fullføre testmatrisen for åpen beta på mobil, nettbrett og desktop.
+2. Lukke eventuelle blokkerende feil fra betatesten.
+3. Bygge abonnement-endepunkt og senderjobb etter leveringsgaten i `docs/push-v1.md`.

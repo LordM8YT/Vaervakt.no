@@ -7,6 +7,7 @@ require_once __DIR__ . '/station-lib.php';
 function vv_stations_latest(PDO $pdo): void
 {
     $limit = max(1, min(100, (int) ($_GET['limit'] ?? 50)));
+    $fetchLimit = max(100, min(500, $limit * 5));
     $lat = vv_float($_GET['lat'] ?? null);
     $lon = vv_float($_GET['lon'] ?? null);
     $radiusKm = max(1, min(250, (float) ($_GET['radiusKm'] ?? 50)));
@@ -36,16 +37,20 @@ function vv_stations_latest(PDO $pdo): void
         )
         WHERE s.status = 'approved'
         ORDER BY s.last_seen_at IS NULL ASC, s.last_seen_at DESC, s.updated_at DESC
-        LIMIT {$limit}
+        LIMIT {$fetchLimit}
     ");
     $stmt->execute();
     $rows = $stmt->fetchAll() ?: [];
 
-    $stations = [];
+    $matchingStations = [];
     foreach ($rows as $row) {
         $include = true;
+        $distanceKm = null;
         if ($lat !== null && $lon !== null && $row['latitude'] !== null && $row['longitude'] !== null) {
-            $include = vv_distance_km($lat, $lon, (float) $row['latitude'], (float) $row['longitude']) <= $radiusKm;
+            $distanceKm = vv_distance_km($lat, $lon, (float) $row['latitude'], (float) $row['longitude']);
+            $include = $distanceKm <= $radiusKm;
+        } elseif ($lat !== null && $lon !== null) {
+            $include = false;
         }
 
         if ($include && $terms) {
@@ -60,13 +65,49 @@ function vv_stations_latest(PDO $pdo): void
         }
 
         if ($include) {
-            $stations[] = vv_station_public_row($row);
+            $station = vv_station_public_row($row);
+            $station['distanceKm'] =
+                $distanceKm !== null && $station['coordinatePrecision'] !== 'hidden'
+                    ? round($distanceKm, 1)
+                    : null;
+            $matchingStations[] = [
+                'distanceKm' => $distanceKm,
+                'station' => $station,
+            ];
         }
     }
+
+    if ($lat !== null && $lon !== null) {
+        usort($matchingStations, static function (array $first, array $second): int {
+            $firstDistance = $first['distanceKm'] ?? INF;
+            $secondDistance = $second['distanceKm'] ?? INF;
+            if ($firstDistance !== $secondDistance) {
+                return $firstDistance <=> $secondDistance;
+            }
+
+            $onlineComparison =
+                ((int) ($second['station']['online'] ?? false))
+                <=> ((int) ($first['station']['online'] ?? false));
+            if ($onlineComparison !== 0) {
+                return $onlineComparison;
+            }
+            return strcmp(
+                (string) ($second['station']['lastSeenAt'] ?? ''),
+                (string) ($first['station']['lastSeenAt'] ?? '')
+            );
+        });
+    }
+
+    $total = count($matchingStations);
+    $stations = array_map(
+        static fn (array $entry): array => $entry['station'],
+        array_slice($matchingStations, 0, $limit)
+    );
 
     vv_json([
         'success' => true,
         'source' => 'Værvakt stasjonsnett',
+        'total' => $total,
         'count' => count($stations),
         'stations' => $stations,
     ], 200, 'public, max-age=60');

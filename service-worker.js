@@ -1,4 +1,4 @@
-const CACHE_NAME = "vaervakt-svelte-shell-v1";
+const CACHE_NAME = "vaervakt-svelte-shell-v2";
 const CORE_ASSETS = [
   "/",
   "/lokalt/",
@@ -6,6 +6,7 @@ const CORE_ASSETS = [
   "/manifest.json",
   "/weather.png",
   "/weather.ico",
+  "/static/js/met-alert-banner.js",
 ];
 
 self.addEventListener("install", (event) => {
@@ -22,7 +23,12 @@ self.addEventListener("install", (event) => {
         // Kjernen er fortsatt nok til å starte appen på nett.
       }
 
-      await Promise.allSettled([...new Set(assets)].map((asset) => cache.add(asset)));
+      await Promise.allSettled(
+        [...new Set(assets)].map((asset) =>
+          cache.add(new Request(asset, { cache: "reload" }))
+        )
+      );
+
       await self.skipWaiting();
     })()
   );
@@ -46,16 +52,27 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/admin/")) return;
 
-  if (request.mode === "navigate") {
+  const isNavigation = request.mode === "navigate";
+  const isAppAsset =
+    url.origin === self.location.origin &&
+    (url.pathname.endsWith(".html") ||
+      url.pathname.endsWith(".js") ||
+      url.pathname.endsWith(".css") ||
+      url.pathname === "/asset-manifest.json" ||
+      url.pathname === "/manifest.json");
+
+  if (isNavigation || isAppAsset) {
     event.respondWith(
-      fetch(request)
+      fetch(new Request(request, { cache: "no-store" }))
         .then((response) => {
           if (response.ok && url.origin === self.location.origin) {
             caches.open(CACHE_NAME).then((cache) => cache.put(request, response.clone()));
           }
           return response;
         })
-        .catch(() => caches.match(request).then((cached) => cached || caches.match("/")))
+        .catch(() =>
+          caches.match(request).then((cached) => cached || (isNavigation ? caches.match("/") : undefined))
+        )
     );
     return;
   }

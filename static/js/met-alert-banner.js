@@ -85,6 +85,46 @@
     return coordinatesFromStorage() || await coordinatesFromGrantedGps();
   }
 
+  function cleanDateValue(value) {
+    return String(value || '').trim();
+  }
+
+  function parseAlertDate(value) {
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  function formatAlertDate(value) {
+    const date = parseAlertDate(value);
+    if (!date) return '';
+
+    return new Intl.DateTimeFormat('nb-NO', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date).replace(',', ' kl.');
+  }
+
+  function formatPeriod(alert) {
+    const starts = formatAlertDate(alert.startsAt);
+    const ends = formatAlertDate(alert.endsAt);
+
+    if (starts && ends) return `${starts} – ${ends}`;
+    if (starts) return `${starts} – faren pågår`;
+    if (ends) return `Pågår nå – til ${ends}`;
+    return '';
+  }
+
+  function severityText(severity) {
+    if (severity === 'danger') return 'Rødt farenivå';
+    if (severity === 'warning') return 'Oransje farenivå';
+    if (severity === 'notice') return 'Gult farenivå';
+    return 'Informasjon';
+  }
+
   function normalizeAlert(alert, source = 'user') {
     if (!alert || typeof alert !== 'object') return null;
 
@@ -107,6 +147,8 @@
       area: String(alert.area || '').trim(),
       icon: String(alert.icon || (sourceName === 'met' ? '⚠️' : '📢')),
       severity,
+      startsAt: cleanDateValue(alert.startsAt ?? alert.onset ?? alert.effective ?? alert.startTime ?? alert.validFrom),
+      endsAt: cleanDateValue(alert.endsAt ?? alert.expires ?? alert.endTime ?? alert.validTo),
       priority: Number.isFinite(Number(alert.priority)) ? Number(alert.priority) : 0,
     };
   }
@@ -140,70 +182,164 @@
         position: relative;
         z-index: 2147483000;
         width: 100%;
-        padding-top: env(safe-area-inset-top, 0px);
+        padding: max(env(safe-area-inset-top, 0px), 8px) 10px 10px;
+        box-sizing: border-box;
+        background: #07172b;
         font-family: inherit;
       }
       .vv-alert {
+        --vv-accent: #f59e0b;
         display: grid;
-        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-columns: 44px minmax(0, 1fr) 38px;
         gap: 12px;
         align-items: start;
-        padding: 12px 16px;
-        color: #fff;
-        background: linear-gradient(135deg, #92400e, #c2410c);
-        border-bottom: 1px solid rgba(255,255,255,.25);
-        box-shadow: 0 8px 24px rgba(2,6,23,.22);
+        width: min(1040px, 100%);
+        margin: 0 auto 8px;
+        padding: 13px 12px 13px 14px;
+        box-sizing: border-box;
+        color: #f8fafc;
+        background: #0b1e35;
+        border: 1px solid rgba(148, 163, 184, .2);
+        border-left: 5px solid var(--vv-accent);
+        border-radius: 14px;
+        box-shadow: 0 8px 24px rgba(2, 6, 23, .28);
       }
-      .vv-alert[data-severity="danger"] {
-        background: linear-gradient(135deg, #7f1d1d, #dc2626);
-      }
-      .vv-alert[data-severity="warning"] {
-        background: linear-gradient(135deg, #92400e, #c2410c);
-      }
-      .vv-alert[data-severity="notice"] {
-        color: #111827;
-        background: linear-gradient(135deg, #fde047, #f59e0b);
-      }
-      .vv-alert[data-severity="info"] {
-        background: linear-gradient(135deg, #075985, #0284c7);
+      .vv-alert:last-child { margin-bottom: 0; }
+      .vv-alert[data-severity="danger"] { --vv-accent: #ef4444; }
+      .vv-alert[data-severity="warning"] { --vv-accent: #f59e0b; }
+      .vv-alert[data-severity="notice"] { --vv-accent: #facc15; }
+      .vv-alert[data-severity="info"] { --vv-accent: #38bdf8; }
+      .vv-alert-icon-wrap {
+        display: grid;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 10px;
+        color: #07111f;
+        background: var(--vv-accent);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,.22);
       }
       .vv-alert-icon {
-        font-size: 1.35rem;
-        line-height: 1.2;
+        font-size: 1.45rem;
+        line-height: 1;
       }
-      .vv-alert-copy strong,
-      .vv-alert-copy span {
+      .vv-alert-copy { min-width: 0; }
+      .vv-alert-heading {
+        display: flex;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 5px 8px;
+        min-width: 0;
+      }
+      .vv-alert-title {
         display: block;
+        color: #fff;
+        font-size: .98rem;
+        font-weight: 800;
+        line-height: 1.3;
       }
-      .vv-alert-copy strong {
-        font-size: .96rem;
-      }
-      .vv-alert-copy span {
-        margin-top: 2px;
-        font-size: .82rem;
-        line-height: 1.4;
-        opacity: .94;
+      .vv-alert-level {
+        color: var(--vv-accent);
+        font-size: .76rem;
+        font-weight: 800;
+        line-height: 1.3;
       }
       .vv-alert-source {
-        margin-left: 7px;
-        font-size: .7rem;
-        font-weight: 700;
+        font-size: .67rem;
+        font-weight: 800;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        color: #93c5fd;
+      }
+      .vv-alert-detail {
+        display: block;
+        margin-top: 5px;
+        color: #dbe7f4;
+        font-size: .82rem;
+        line-height: 1.45;
+      }
+      .vv-alert-area {
+        display: block;
+        margin-top: 5px;
+        color: #b7c7da;
+        font-size: .78rem;
+        font-weight: 650;
+        line-height: 1.4;
+      }
+      .vv-alert-period {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        width: fit-content;
+        max-width: 100%;
+        margin-top: 9px;
+        padding: 7px 9px;
+        border: 1px solid rgba(255,255,255,.14);
+        border-radius: 9px;
+        color: #fff;
+        background: rgba(2, 11, 24, .72);
+        font-size: .78rem;
+        font-weight: 750;
+        line-height: 1.35;
+      }
+      .vv-alert-period::before {
+        content: '◷';
+        flex: 0 0 auto;
+        color: var(--vv-accent);
+        font-size: 1rem;
+      }
+      .vv-alert-period-label {
+        margin-right: 2px;
+        color: #a9bbcf;
+        font-size: .67rem;
+        font-weight: 800;
         letter-spacing: .04em;
         text-transform: uppercase;
-        opacity: .78;
       }
       .vv-alert-close {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
         border: 0;
-        padding: 2px 6px;
-        color: inherit;
-        background: transparent;
+        border-radius: 9px;
+        padding: 0;
+        color: #fff;
+        background: rgba(255,255,255,.08);
         font: inherit;
-        font-size: 1.25rem;
+        font-size: 1.45rem;
         line-height: 1;
         cursor: pointer;
       }
+      .vv-alert-close:hover { background: rgba(255,255,255,.14); }
+      .vv-alert-close:focus-visible {
+        outline: 2px solid var(--vv-accent);
+        outline-offset: 2px;
+      }
       @media (max-width: 640px) {
-        .vv-alert { padding: 10px 12px; gap: 9px; }
+        #vv-alerts { padding-left: 7px; padding-right: 7px; }
+        .vv-alert {
+          grid-template-columns: 36px minmax(0, 1fr) 32px;
+          gap: 9px;
+          padding: 11px 8px 11px 10px;
+          border-radius: 12px;
+        }
+        .vv-alert-icon-wrap { width: 34px; height: 34px; border-radius: 8px; }
+        .vv-alert-icon { font-size: 1.15rem; }
+        .vv-alert-title { font-size: .9rem; }
+        .vv-alert-level { font-size: .7rem; }
+        .vv-alert-detail { font-size: .78rem; }
+        .vv-alert-area { font-size: .74rem; }
+        .vv-alert-period {
+          width: 100%;
+          box-sizing: border-box;
+          align-items: flex-start;
+          flex-wrap: wrap;
+          padding: 8px 9px;
+          font-size: .76rem;
+        }
+        .vv-alert-period-label { flex-basis: calc(100% - 24px); }
+        .vv-alert-close { width: 30px; height: 30px; font-size: 1.3rem; }
       }
     `;
 
@@ -231,29 +367,66 @@
       banner.className = 'vv-alert';
       banner.dataset.severity = alert.severity || 'notice';
 
+      const iconWrap = document.createElement('span');
+      iconWrap.className = 'vv-alert-icon-wrap';
+      iconWrap.setAttribute('aria-hidden', 'true');
+
       const icon = document.createElement('span');
       icon.className = 'vv-alert-icon';
-      icon.setAttribute('aria-hidden', 'true');
       icon.textContent = alert.icon || '⚠️';
+      iconWrap.appendChild(icon);
 
       const copy = document.createElement('div');
       copy.className = 'vv-alert-copy';
 
+      const heading = document.createElement('div');
+      heading.className = 'vv-alert-heading';
+
       const title = document.createElement('strong');
+      title.className = 'vv-alert-title';
       title.textContent = alert.title || 'Varsel';
+
+      const level = document.createElement('span');
+      level.className = 'vv-alert-level';
+      level.textContent = severityText(alert.severity);
 
       const source = document.createElement('small');
       source.className = 'vv-alert-source';
       source.textContent = alert.source === 'met' ? 'MET' : 'Værvakt';
-      title.appendChild(source);
 
-      const detail = document.createElement('span');
-      detail.textContent = [alert.area, alert.description, alert.instruction]
-        .filter(Boolean)
-        .join(' – ');
+      heading.append(title, level, source);
+      copy.appendChild(heading);
 
-      copy.append(title);
-      if (detail.textContent) copy.append(detail);
+      const detailText = [alert.description, alert.instruction].filter(Boolean).join(' – ');
+      if (detailText) {
+        const detail = document.createElement('span');
+        detail.className = 'vv-alert-detail';
+        detail.textContent = detailText;
+        copy.appendChild(detail);
+      }
+
+      if (alert.area) {
+        const area = document.createElement('span');
+        area.className = 'vv-alert-area';
+        area.textContent = `Område: ${alert.area}`;
+        copy.appendChild(area);
+      }
+
+      const periodText = formatPeriod(alert);
+      if (periodText) {
+        const period = document.createElement('div');
+        period.className = 'vv-alert-period';
+
+        const periodLabel = document.createElement('span');
+        periodLabel.className = 'vv-alert-period-label';
+        periodLabel.textContent = 'Tidsperiode';
+
+        const periodValue = document.createElement('span');
+        periodValue.textContent = periodText;
+
+        period.append(periodLabel, periodValue);
+        copy.appendChild(period);
+      }
 
       const close = document.createElement('button');
       close.className = 'vv-alert-close';
@@ -262,7 +435,7 @@
       close.textContent = '×';
       close.addEventListener('click', () => dismiss(alert, banner));
 
-      banner.append(icon, copy, close);
+      banner.append(iconWrap, copy, close);
       container.appendChild(banner);
     });
 
@@ -314,10 +487,7 @@
     const calm = /rolige forhold|ingen tydelige værfarer|ingen aktive varsler/i
       .test(`${title} ${description}`);
 
-    // Eldre build kan fortsatt ligge i en nettlesercache. Fjern kortet fysisk,
-    // ikke bare med CSS, slik at det ikke kan bli stående ved siden av banneret.
     card.remove();
-
     userAlerts = userAlerts.filter((alert) => alert.id !== 'legacy-vaervakt-status');
 
     if (!calm && (title || description)) {

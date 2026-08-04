@@ -53,16 +53,40 @@ function vv_met_clean_title(string $headline, string $fallback): string
     $headline = trim($headline);
     if ($headline === '') return $fallback;
 
-    // MET-headline kan inneholde område og ISO-datoer i samme tekststreng.
-    // Banneret viser område og tidsperiode separat, så behold kun selve varselnavnet.
     $parts = array_values(array_filter(array_map('trim', explode(',', $headline)), static fn ($part) => $part !== ''));
     $title = $parts[0] ?? $headline;
 
-    // Ekstra sikkerhet dersom en ISO-tid skulle havne i første del.
     $title = (string) preg_replace('/\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})?\b/u', '', $title);
     $title = trim($title, " \t\n\r\0\x0B,-–");
 
     return $title !== '' ? $title : $fallback;
+}
+
+function vv_met_headline_times(string $headline): array
+{
+    if ($headline === '') return ['', ''];
+
+    preg_match_all(
+        '/\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})?\b/u',
+        $headline,
+        $matches
+    );
+
+    $times = $matches[0] ?? [];
+    return [
+        (string) ($times[0] ?? ''),
+        (string) ($times[1] ?? ''),
+    ];
+}
+
+function vv_met_fetch_time(array $properties, array $keys): string
+{
+    foreach ($keys as $key) {
+        $value = trim((string) ($properties[$key] ?? ''));
+        if ($value !== '') return $value;
+    }
+
+    return '';
 }
 
 function vv_fetch_met_alerts(float $lat, float $lon): array
@@ -109,6 +133,20 @@ try {
         $mapped = vv_met_alert_event_map($event);
         $rawTitle = trim((string) ($properties['headline'] ?? $properties['title'] ?? $mapped['label']));
         $title = vv_met_clean_title($rawTitle, $mapped['label']);
+        [$headlineStart, $headlineEnd] = vv_met_headline_times($rawTitle);
+
+        $startsAt = vv_met_fetch_time($properties, [
+            'onset', 'effective', 'startsAt', 'startTime', 'validFrom', 'valid_from', 'start_time'
+        ]);
+        $endsAt = vv_met_fetch_time($properties, [
+            'expires', 'ends', 'endsAt', 'endTime', 'validTo', 'valid_to', 'end_time'
+        ]);
+
+        // Noen MET-varsler har tidsperioden kun innebygd i headline.
+        // Bruk den som fallback, men vis den aldri rått i tittelen.
+        if ($startsAt === '') $startsAt = $headlineStart;
+        if ($endsAt === '') $endsAt = $headlineEnd;
+
         $description = trim((string) ($properties['description'] ?? $properties['consequences'] ?? ''));
         $instruction = trim((string) ($properties['instruction'] ?? $properties['recommendation'] ?? ''));
         $area = trim((string) ($properties['area'] ?? $properties['areaDesc'] ?? ''));
@@ -125,8 +163,8 @@ try {
             'description' => $description,
             'instruction' => $instruction,
             'area' => $area,
-            'startsAt' => (string) ($properties['onset'] ?? $properties['effective'] ?? ''),
-            'endsAt' => (string) ($properties['expires'] ?? $properties['ends'] ?? ''),
+            'startsAt' => $startsAt,
+            'endsAt' => $endsAt,
             'source' => 'MET',
         ];
     }

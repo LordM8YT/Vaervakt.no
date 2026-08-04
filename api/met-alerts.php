@@ -17,7 +17,7 @@ function vv_met_alert_event_map(string $event): array
         'rainflood' => ['label' => 'Regnflom', 'icon' => '🌊', 'kind' => 'flood'],
         'flood' => ['label' => 'Flomfare', 'icon' => '🌊', 'kind' => 'flood'],
         'wind' => ['label' => 'Sterk vind', 'icon' => '💨', 'kind' => 'wind'],
-        'gale' => ['label' => 'Kraftig vind', 'icon' => '💨', 'kind' => 'wind'],
+        'gale' => ['label' 'Kraftig vind', 'icon' => '💨', 'kind' => 'wind'],
         'snow' => ['label' => 'Snøfare', 'icon' => '❄️', 'kind' => 'snow'],
         'blowingsnow' => ['label' => 'Snøfokk', 'icon' => '❄️', 'kind' => 'snow'],
         'ice' => ['label' => 'Glatt føre', 'icon' => '🧊', 'kind' => 'ice'],
@@ -46,6 +46,23 @@ function vv_met_alert_severity(array $properties): string
     if ($severity === 'moderate') return 'warning';
 
     return 'notice';
+}
+
+function vv_met_clean_title(string $headline, string $fallback): string
+{
+    $headline = trim($headline);
+    if ($headline === '') return $fallback;
+
+    // MET-headline kan inneholde område og ISO-datoer i samme tekststreng.
+    // Banneret viser område og tidsperiode separat, så behold kun selve varselnavnet.
+    $parts = array_values(array_filter(array_map('trim', explode(',', $headline)), static fn ($part) => $part !== ''));
+    $title = $parts[0] ?? $headline;
+
+    // Ekstra sikkerhet dersom en ISO-tid skulle havne i første del.
+    $title = (string) preg_replace('/\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})?\b/u', '', $title);
+    $title = trim($title, " \t\n\r\0\x0B,-–");
+
+    return $title !== '' ? $title : $fallback;
 }
 
 function vv_fetch_met_alerts(float $lat, float $lon): array
@@ -90,7 +107,8 @@ try {
         );
 
         $mapped = vv_met_alert_event_map($event);
-        $title = trim((string) ($properties['headline'] ?? $properties['title'] ?? $mapped['label']));
+        $rawTitle = trim((string) ($properties['headline'] ?? $properties['title'] ?? $mapped['label']));
+        $title = vv_met_clean_title($rawTitle, $mapped['label']);
         $description = trim((string) ($properties['description'] ?? $properties['consequences'] ?? ''));
         $instruction = trim((string) ($properties['instruction'] ?? $properties['recommendation'] ?? ''));
         $area = trim((string) ($properties['area'] ?? $properties['areaDesc'] ?? ''));
@@ -98,7 +116,7 @@ try {
         $alerts[] = [
             'id' => (string) ($feature['id'] ?? $properties['id'] ?? sha1($title . $event . $area)),
             'event' => $event,
-            'title' => $title !== '' ? $title : $mapped['label'],
+            'title' => $title,
             'label' => $mapped['label'],
             'icon' => $mapped['icon'],
             'kind' => $mapped['kind'],

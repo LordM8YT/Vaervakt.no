@@ -17,7 +17,7 @@ function vv_met_alert_event_map(string $event): array
         'rainflood' => ['label' => 'Regnflom', 'icon' => '🌊', 'kind' => 'flood'],
         'flood' => ['label' => 'Flomfare', 'icon' => '🌊', 'kind' => 'flood'],
         'wind' => ['label' => 'Sterk vind', 'icon' => '💨', 'kind' => 'wind'],
-        'gale' => ['label' 'Kraftig vind', 'icon' => '💨', 'kind' => 'wind'],
+        'gale' => ['label' => 'Kraftig vind', 'icon' => '💨', 'kind' => 'wind'],
         'snow' => ['label' => 'Snøfare', 'icon' => '❄️', 'kind' => 'snow'],
         'blowingsnow' => ['label' => 'Snøfokk', 'icon' => '❄️', 'kind' => 'snow'],
         'ice' => ['label' => 'Glatt føre', 'icon' => '🧊', 'kind' => 'ice'],
